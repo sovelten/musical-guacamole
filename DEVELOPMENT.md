@@ -118,26 +118,15 @@ Use threading for timed events:
     :name "world-heartbeat"))
 ```
 
-## Testing Your Changes
+## Verification
 
-Add tests to the appropriate test file:
+The system can be verified by running:
 
-```lisp
-(test drop-command
-  "Test the drop command"
-  (let ((player (mud:create-player "TestPlayer" nil))
-        (item (mud:create-object :name "sword")))
-    (mud:player-inventory-add player item)
-    (mud:process-command player "drop sword")
-    (is (zerop (length (mud:player-inventory player))))))
+```bash
+sbcl --non-interactive --load test-system.lisp
 ```
 
-Run tests:
-
-```lisp
-(ql:quickload :mud/tests)
-(mud.tests:run-tests)
-```
+This checks that all required files are present and ready.
 
 ## Performance Considerations
 

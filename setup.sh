@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Setup script for musical-guacamole MUD
 
 echo "Installing dependencies for musical-guacamole MUD..."

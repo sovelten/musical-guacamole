@@ -4,6 +4,8 @@ Welcome to the Musical Guacamole MUD project! This document will guide you throu
 
 ## 📚 Documentation
 
+## 📚 Where to Start
+
 ### For Users (Getting Started)
 1. **[QUICKSTART.md](QUICKSTART.md)** ⭐ **START HERE**
    - Installation instructions
@@ -39,6 +41,13 @@ Welcome to the Musical Guacamole MUD project! This document will guide you throu
    - Feature checklist
    - Design decisions
    - Future development roadmap
+
+### For Testing & Verification
+6. **[TESTING.md](TESTING.md)**
+   - How to verify the system
+   - Running tests
+   - Troubleshooting
+   - Manual testing
 
 ## 🏗️ Project Structure
 
