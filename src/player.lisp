@@ -43,11 +43,16 @@
   "Send a message to a player."
   (handler-case
       (let ((stream (usocket:socket-stream (player-socket player))))
-        (format stream "~A~%" message)
-        (force-output stream))
+        (when stream
+          (format stream "~A~%" message)
+          (force-output stream)))
     (error (e)
-      (mud.utils:log-error "Failed to send message to player ~A: ~A" 
-                          (object-name player) e))))
+      ;; Only log if it's not a connection error
+      (let ((error-str (format nil "~A" e)))
+        (unless (or (search "Broken pipe" error-str)
+                    (search "closed" error-str))
+          (mud.utils:log-error "Failed to send message to player ~A: ~A" 
+                              (object-name player) e))))))
 
 (defun player-send-prompt (player)
   "Send a prompt to a player."
@@ -74,5 +79,10 @@
       (room-remove-object room player))
     ;; Remove from world
     (world-remove-player (object-id player))
-    ;; Close socket
-    (usocket:socket-close (player-socket player))))
+    ;; Close socket if it exists
+    (when (player-socket player)
+      (handler-case
+          (usocket:socket-close (player-socket player))
+        (error (e)
+          (mud.utils:log-error "Error closing socket for ~A: ~A" 
+                              (object-name player) e))))))

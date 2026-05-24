@@ -10,6 +10,7 @@
 
 (test room-connectivity
   "Test that rooms are properly connected"
+  (mud:world-initialize)
   (let ((room1 (mud:create-room :name "Room 1"))
         (room2 (mud:create-room :name "Room 2")))
     (mud:room-add-exit room1 "north" room2)

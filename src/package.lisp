@@ -36,6 +36,7 @@
    #:world-get-room
    #:world-all-rooms
    #:*world*
+   #:*players*
    #:*start-room*
    
    ;; Player system
@@ -68,4 +69,4 @@
 
 (defpackage #:mud.tests
   (:use #:cl #:fiveam)
-  (:export #:run-tests))
+  (:export #:run-tests #:mud-tests))

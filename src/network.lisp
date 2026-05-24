@@ -12,28 +12,40 @@
         (loop while *server-running*
               do
               (handler-case
-                  (progn
-                    ;; Send prompt
-                    (player-send-prompt player)
-                    
-                    ;; Try to read from socket using socket-stream
-                    (let ((stream (handler-case
-                                    (usocket:socket-stream socket)
-                                    (error () nil))))
-                      (when stream
-                        (let ((line (read-line stream nil nil)))
-                          (when line
-                            (let ((trimmed (string-trim '(#\Return #\Newline) line)))
-                              (when (and trimmed (> (length trimmed) 0))
-                                (process-command player trimmed)))))))
-                    )
+                  (let ((stream (handler-case
+                                  (usocket:socket-stream socket)
+                                  (error () nil))))
+                    (if (null stream)
+                        ;; Socket is closed, exit loop
+                        (return)
+                        ;; Socket is open, continue
+                        (progn
+                          ;; Send prompt
+                          (player-send-prompt player)
+                          
+                          ;; Receive input
+                          (let ((line (read-line stream nil nil)))
+                            (when line
+                              (let ((trimmed (string-trim '(#\Return #\Newline) line)))
+                                (when (and trimmed (> (length trimmed) 0))
+                                  (process-command player trimmed))))))))
                 (end-of-file ()
                   ;; Connection closed by client
                   (mud.utils:log-message "Client ~A disconnected" (object-name player))
                   (return))
                 (error (e)
-                  (mud.utils:log-error "Error in client handler: ~A" e)
-                  (return)))))
+                  ;; Check if this is a "broken pipe" or similar connection error
+                  (let ((error-str (format nil "~A" e)))
+                    (if (or (search "Broken pipe" error-str)
+                            (search "closed" error-str))
+                        ;; Connection error, exit gracefully
+                        (progn
+                          (mud.utils:log-message "Client ~A connection lost" (object-name player))
+                          (return))
+                        ;; Other error, log it
+                        (progn
+                          (mud.utils:log-error "Error in client handler: ~A" e)
+                          (return))))))))
     (error (e)
       (mud.utils:log-error "Client handler error for ~A: ~A" (object-name player) e)))
   
