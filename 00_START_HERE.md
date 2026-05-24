@@ -87,11 +87,10 @@ telnet localhost 8888
 
 ```bash
 # Run comprehensive tests
-./test-setup.sh
-
-# Or run system verification
-sbcl --script test-system.lisp
+sbcl --non-interactive --load run-tests.lisp
 ```
+
+**Note**: The tests now run in a non-interactive mode and exit cleanly.
 
 ### Example Session
 

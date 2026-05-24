@@ -1,3 +1,6 @@
+(unless (find-package :quicklisp)
+  (load "/home/sophia/.quicklisp/setup.lisp"))
+
 (push #p"./" asdf:*central-registry*)
 (asdf:clear-configuration)
 (ql:quickload '(:usocket :bordeaux-threads :fiveam))

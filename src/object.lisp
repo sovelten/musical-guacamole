@@ -82,8 +82,13 @@
 
 (defun room-remove-object (room obj)
   "Remove an object from a room."
-  (setf (room-contents room)
-        (delete obj (room-contents room))))
+  (let ((contents (room-contents room)))
+    (loop for i from 0 below (fill-pointer contents)
+          do (when (eq (aref contents i) obj)
+               (loop for j from i below (1- (fill-pointer contents))
+                     do (setf (aref contents j) (aref contents (1+ j))))
+               (decf (fill-pointer contents))
+               (return)))))
 
 (defun room-add-exit (room direction target-room)
   "Add an exit from a room to another room."

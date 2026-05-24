@@ -25,10 +25,13 @@
                           
                           ;; Receive input
                           (let ((line (read-line stream nil nil)))
-                            (when line
-                              (let ((trimmed (string-trim '(#\Return #\Newline) line)))
-                                (when (and trimmed (> (length trimmed) 0))
-                                  (process-command player trimmed))))))))
+                            (if line
+                                (let ((trimmed (string-trim '(#\Return #\Newline) line)))
+                                  (when (and trimmed (> (length trimmed) 0))
+                                    (process-command player trimmed)))
+                                (progn
+                                  (mud.utils:log-message "Client ~A disconnected (EOF)" (object-name player))
+                                  (return)))))))
                 (end-of-file ()
                   ;; Connection closed by client
                   (mud.utils:log-message "Client ~A disconnected" (object-name player))
@@ -50,6 +53,9 @@
       (mud.utils:log-error "Client handler error for ~A: ~A" (object-name player) e)))
   
   ;; Cleanup when disconnected
+  (let ((player-id (object-id player)))
+    (mud.utils:log-message "Attempting to remove thread for player ~A" player-id)
+    (remhash player-id *player-threads*))
   (player-disconnect player))
 
 (defun accept-connections ()
