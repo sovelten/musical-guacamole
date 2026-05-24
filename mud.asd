@@ -30,4 +30,6 @@
                  (:file "test-object" :depends-on ("test-package"))
                  (:file "test-world" :depends-on ("test-package"))
                  (:file "test-player" :depends-on ("test-package"))
-                 (:file "test-commands" :depends-on ("test-package"))))))
+                 (:file "test-commands" :depends-on ("test-package"))
+                 (:file "test-network" :depends-on ("test-package"))
+                 (:file "test-integration" :depends-on ("test-package"))))))

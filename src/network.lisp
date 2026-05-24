@@ -8,26 +8,32 @@
 (defun handle-client (player)
   "Main loop for handling a client connection."
   (handler-case
-      (loop while *server-running*
-            do
-            (handler-case
-                (progn
-                  ;; Send prompt
-                  (player-send-prompt player)
-                  
-                  ;; Receive input
-                  (let ((input (usocket:socket-receive (player-socket player) 
-                                                       *buffer-size*)))
-                    (when input
-                      ;; Process input
-                      (let ((line (string-trim '(#\Return #\Newline) input)))
-                        (when (and line (> (length line) 0))
-                          (process-command player line))))))
-              (usocket:timeout-error ()
-                ;; Just a timeout, continue the loop
-                nil)
-              (error (e)
-                (mud.utils:log-error "Error in client handler: ~A" e))))
+      (let ((socket (player-socket player)))
+        (loop while *server-running*
+              do
+              (handler-case
+                  (progn
+                    ;; Send prompt
+                    (player-send-prompt player)
+                    
+                    ;; Try to read from socket using socket-stream
+                    (let ((stream (handler-case
+                                    (usocket:socket-stream socket)
+                                    (error () nil))))
+                      (when stream
+                        (let ((line (read-line stream nil nil)))
+                          (when line
+                            (let ((trimmed (string-trim '(#\Return #\Newline) line)))
+                              (when (and trimmed (> (length trimmed) 0))
+                                (process-command player trimmed)))))))
+                    )
+                (end-of-file ()
+                  ;; Connection closed by client
+                  (mud.utils:log-message "Client ~A disconnected" (object-name player))
+                  (return))
+                (error (e)
+                  (mud.utils:log-error "Error in client handler: ~A" e)
+                  (return)))))
     (error (e)
       (mud.utils:log-error "Client handler error for ~A: ~A" (object-name player) e)))
   

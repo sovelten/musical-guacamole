@@ -3,7 +3,10 @@
 ;; Entry point to start the MUD server
 (defun start ()
   "Start the MUD server with default settings."
-  (start-mud-server))
+  (when (start-mud-server)
+    ;; Keep the main thread alive while server is running
+    (loop while *server-running*
+          do (sleep 1))))
 
 (defun status ()
   "Print the server status."
