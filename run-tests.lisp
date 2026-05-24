@@ -11,5 +11,7 @@
 ;; Run the tests
 (format t "~%=== Running MUD Tests ===~%~%")
 (fiveam:run! 'mud.tests:mud-tests)
-(format t t "~%=== Tests Complete ===~%~%")
+(format t "~%=== Tests Complete ===~%~%")
+
+;; Exit cleanly
 (sb-ext:exit :code 0)
