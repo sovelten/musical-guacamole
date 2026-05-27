@@ -66,7 +66,3 @@
    #:format-message
    #:log-message
    #:log-error))
-
-(defpackage #:mud.tests
-  (:use #:cl #:fiveam)
-  (:export #:run-tests #:mud-tests))
