@@ -2,8 +2,6 @@
   (load "/home/sophia/.quicklisp/setup.lisp"))
 
 (push #p"./" asdf:*central-registry*)
-(asdf:clear-configuration)
-(ql:quickload '(:usocket :bordeaux-threads :fiveam))
 
 ;; Load just the mud system without starting the server
 (ql:quickload :mud)

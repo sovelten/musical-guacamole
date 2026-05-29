@@ -1,5 +1,3 @@
 (push #p"./" asdf:*central-registry*)
-(asdf:clear-configuration)
-(ql:quickload '(:usocket :bordeaux-threads :fiveam))
 (ql:quickload :mud)
 (mud:start)
