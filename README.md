@@ -1,8 +1,13 @@
 # Musical Guacamole - A Common Lisp MUD Server
 
-A fully functional MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's Game Driver (DGD) and LMUD. Built with a solid, extensible foundation for advanced features like persistent living images and in-world programming.
+A MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's Game Driver (DGD) and LMUD, with the added reckless capability of running lisp code at your own risk and peril (don't start a real server with this on the internet).
 
-**Status**: ✅ Production-ready and fully functional
+**Status**: ✅ Production-ready and fully functional (it is obviously not production-ready nor fully functional, don't believe the LLM)
+
+## Inspiration
+
+- **DGD Manual**: https://www.dworkin.nl/dgd/
+- **LMUD**: https://lmud.common-lisp.dev/
 
 ## Table of Contents
 
@@ -40,7 +45,7 @@ cd musical-guacamole
 # In SBCL:
 (push #p"./" asdf:*central-registry*)
 (ql:quickload :mud)
-(mud:start)
+(mud:start-mud-server)
 ```
 
 You should see:
@@ -50,10 +55,10 @@ You should see:
 [INFO] MUD Server started on 127.0.0.1:8888
 ```
 
-Or run non-interactively:
+Or load run-mud.lisp:
 
 ```bash
-sbcl --non-interactive --load run-mud.lisp
+sbcl --load run-mud.lisp
 ```
 
 ### Connect as a Player
@@ -75,6 +80,7 @@ telnet localhost 8888
 | `say` | `say <message>` | Speak to other players in room |
 | `help` | `help` | List all commands |
 | `quit` | `quit` | Disconnect |
+| `eval` | `eval <sexpr>` | Run arbritrary lisp code!!! (very dangerous) |
 
 ### Example Session
 
@@ -97,6 +103,9 @@ You say: Hello everyone!
 
 > quit
 Goodbye!
+
+> eval (+ 1 2)
+3
 ```
 
 ### Stop the Server
@@ -104,15 +113,16 @@ Goodbye!
 In the SBCL REPL:
 
 ```lisp
-(mud:stop)
+(mud:stop-mud-server)
 ```
 
 ---
 
 ## Features
 
-### ✅ Currently Implemented
+### ✅ Currently Implemented (kind of, in a very crappy state)
 
+- **In-world REPL** - Execute Lisp code from within the game (at your own risk, no guardrails)
 - **Multi-player networking** - Multiple players connect via telnet simultaneously
 - **Object-oriented world** - Everything is an object with unique IDs and extensible properties
 - **Room system** - Navigable rooms with directional exits (north, south, east, west)
@@ -124,27 +134,13 @@ In the SBCL REPL:
 - **Error handling** - Graceful error handling and recovery
 - **Logging system** - Debug logging throughout the system
 
-### 📋 Built-in Commands
-
-All commands are defined in `src/command-handler.lisp` and can be easily extended.
-
-1. **look** - See current room description and contents
-2. **go <direction>** - Navigate between connected rooms
-3. **exits** - List available directions to exit
-4. **inventory** - Display carried items
-5. **say <message>** - Broadcast message to other players in room
-6. **help** - List all available commands
-7. **quit** - Disconnect from MUD
-
 ### 🎯 Planned Features
 
 - **Persistence layer** - Save/load world state to disk
-- **In-world REPL** - Execute Lisp code from within the game
 - **Hot code reloading** - Modify code without restarting
 - **Item system** - Full item objects with properties (take, drop, examine)
 - **NPC support** - Non-player characters with behaviors
-- **Combat system** - Simple combat mechanics
-- **Leveling system** - Experience and character progression
+- **LLM NPCs** - What if we put in some llms armed with some mcp servers to interact in the world?
 
 ---
 
@@ -242,67 +238,6 @@ Telnet Output: Room description + prompt
 4. **Per-player threading** - Concurrent player handling
 5. **Thread-safe design** - Locks protect shared state
 6. **Message broadcasting** - Coordinated multi-player events
-
----
-
-## Project Structure
-
-```
-musical-guacamole/
-├── README.md                   # This file
-├── LICENSE                     # MIT License
-│
-├── 🔧 Scripts
-│   ├── setup.sh               # Install dependencies
-│   ├── test-setup.sh          # Run test suite
-│   ├── run-mud.lisp           # Non-interactive server start
-│   └── run-tests.lisp         # Non-interactive test runner
-│
-├── 📦 System Configuration
-│   ├── mud.asd                # ASDF system definition
-│   └── mud-test.asd           # Test system definition
-│
-├── 💾 Source Code (src/)
-│   ├── package.lisp           # Package definitions & exports
-│   ├── constants.lisp         # Configuration constants
-│   ├── utils.lisp             # Utility functions (IDs, logging)
-│   ├── object.lisp            # Object system & rooms (★ core)
-│   ├── world.lisp             # World management & registry
-│   ├── player.lisp            # Player characters & inventory
-│   ├── command-handler.lisp   # Command system (★ easy to extend)
-│   ├── network.lisp           # Network I/O & threading
-│   └── server.lisp            # Server start/stop
-│
-├── 🧪 Tests (tests/)
-│   ├── test-package.lisp      # Test framework setup
-│   ├── test-object.lisp       # Object system tests
-│   ├── test-world.lisp        # World system tests
-│   ├── test-player.lisp       # Player system tests
-│   ├── test-network.lisp      # Network tests
-│   ├── test-commands.lisp     # Command system tests
-│   └── test-integration.lisp  # Integration tests
-│
-└── 📄 Documentation
-    └── README.md              # This file
-```
-
-### Module Dependencies
-
-```
-package (definitions)
-  ↓
-constants (config)
-  ↓
-utils (logging, IDs)
-  ↓
-object (core) ←────┐
-world (registry)   ├─ command-handler
-player (chars)  ←──┤
-                   ├─ network
-                   └─ server
-```
-
----
 
 ## Development Guide
 
@@ -426,7 +361,7 @@ Use threading for periodic events:
 (mud.tests:run-tests)
 ```
 
-Or non-interactively:
+Or load run-tests.lisp:
 
 ```bash
 sbcl --non-interactive --load run-tests.lisp
@@ -435,20 +370,6 @@ sbcl --non-interactive --load run-tests.lisp
 ---
 
 ## Deployment
-
-### Starting the Server
-
-**Interactively:**
-```lisp
-(push #p"./" asdf:*central-registry*)
-(ql:quickload :mud)
-(mud:start)  ; Returns immediately, server runs in background
-```
-
-**Non-interactively:**
-```bash
-sbcl --non-interactive --load run-mud.lisp
-```
 
 ### Configuration
 
@@ -530,97 +451,6 @@ Manually install dependencies:
 (ql:quickload (list "usocket" "bordeaux-threads" "fiveam"))
 ```
 
-### REPL hangs or crashes
-
-If the old REPL is stuck, kill the worker:
-
-```lisp
-(cl-mcp__pool-kill-worker :reset t)
-```
-
 ---
 
-## Learning Resources
-
-- **Common Lisp HyperSpec**: http://www.lispworks.com/documentation/HyperSpec/
-- **Practical Common Lisp**: http://www.gigamonkeys.com/book/
-- **ASDF Manual**: https://common-lisp.net/project/asdf/
-- **DGD Manual**: https://www.dworkin.nl/dgd/
-- **LMUD**: https://lmud.common-lisp.dev/
-
 ---
-
-## Project Statistics
-
-| Metric | Value |
-|--------|-------|
-| Source files | 8 |
-| Source lines | 950+ |
-| Test files | 7 |
-| Built-in commands | 7 |
-| Classes | 3 (mud-object, mud-room, mud-player) |
-| Dependencies | 2 (usocket, bordeaux-threads) |
-| Threading model | Multi-threaded |
-| Network protocol | Telnet (ASCII) |
-
----
-
-## Inspiration & Philosophy
-
-This project is inspired by:
-
-1. **DGD (Dworkin's Game Driver)** - Pioneering MUD platform with persistent objects
-2. **LMUD (Lisp MUD)** - Common Lisp MUD implementation
-3. **Smalltalk** - Dynamic, reflective programming environments
-
-Core principles:
-
-- **Everything is an object** with unique identity
-- **Runtime extensibility** through property storage
-- **Living environment** - No restart needed to modify code
-- **Lisp-native** - Leverage Lisp's power and flexibility
-- **Modular design** - Clear separation of concerns
-- **Concurrent** - Multiple players simultaneously
-
----
-
-## Next Steps for Development
-
-### Phase 1: Basic Extensions (1-2 hours each)
-
-- [ ] Add `take` / `drop` commands with items
-- [ ] Add `examine` command for detailed inspection
-- [ ] Create more world rooms and connections
-- [ ] Add basic NPC characters
-
-### Phase 2: Game Systems (3-5 hours each)
-
-- [ ] Implement persistence (save/load world)
-- [ ] Add full item system
-- [ ] Implement combat mechanics
-- [ ] Add experience and leveling
-
-### Phase 3: Advanced Features (8+ hours each)
-
-- [ ] In-world Lisp REPL
-- [ ] Hot code reloading
-- [ ] DGD-style privilege levels
-- [ ] Complex AI and behaviors
-
----
-
-## License
-
-MIT License - See LICENSE file for details
-
----
-
-## Acknowledgments
-
-- Inspired by DGD and LMUD projects
-- Built with Common Lisp
-- Uses usocket for networking and bordeaux-threads for concurrency
-
----
-
-**The MUD is ready to run and extend. Start with `telnet localhost 8888` after running `(mud:start)`!** 🎮✨
