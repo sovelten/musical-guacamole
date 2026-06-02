@@ -1,6 +1,6 @@
 # Musical Guacamole - A Common Lisp MUD Server
 
-A MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's Game Driver (DGD) and LMUD, with the added reckless capability of running lisp code at your own risk and peril (don't start a real server with this on the internet).
+A MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's Game Driver (DGD) and LMUD, with the added reckless capability of running lisp code at your own risk and peril (don't start a real server with this on the internet). The name was inspired by the first repository name that github suggested to me.
 
 **Status**: ✅ Production-ready and fully functional (it is obviously not production-ready nor fully functional, don't believe the LLM)
 
