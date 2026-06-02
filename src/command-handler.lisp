@@ -31,6 +31,22 @@
                 (player-send-message player (room-describe target-room)))
               (player-send-message player "You can't go that way."))))))
 
+(define-command "eval" (player args)
+  (if (null args)
+      (player-send-message player "Eval what? Usage: eval <code>")
+      (let* ((code-str (format nil "~{~A~^ ~}" args))
+             (trimmed-str (if (and (>= (length code-str) 2)
+                                   (char= (char code-str 0) #\")
+                                   (char= (char code-str (1- (length code-str))) #\"))
+                              (subseq code-str 1 (1- (length code-str)))
+                              code-str)))
+        (handler-case
+            (let* ((form (read-from-string trimmed-str))
+                   (result (eval form)))
+              (player-send-message player (format nil "~A" result)))
+          (error (e)
+            (player-send-message player (format nil "Error: ~A" e)))))))
+
 (define-command "exits" (player args)
   (declare (ignore args))
   (let ((room (object-location player)))

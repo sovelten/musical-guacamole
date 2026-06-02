@@ -49,3 +49,37 @@
     (mud:process-command player "blahblah")
     (is (not (null player)))))
 
+(test command-processing-eval
+  "Test the eval command"
+  (mud:world-initialize)
+  (let ((player (mud:create-player "TestPlayer" nil))
+        (captured-messages '()))
+    (let ((original-send-message (fdefinition 'mud:player-send-message)))
+      (unwind-protect
+           (progn
+             (setf (fdefinition 'mud:player-send-message)
+                   (lambda (p msg)
+                     (declare (ignore p))
+                     (push msg captured-messages)))
+             
+             ;; Test 1: No arguments
+             (setf captured-messages '())
+             (mud:process-command player "eval")
+             (is (equal '("Eval what? Usage: eval <code>") captured-messages))
+             
+             ;; Test 2: With quotes
+             (setf captured-messages '())
+             (mud:process-command player "eval \"(+ 1 2)\"")
+             (is (equal '("3") captured-messages))
+             
+             ;; Test 3: Without quotes
+             (setf captured-messages '())
+             (mud:process-command player "eval (+ 3 4)")
+             (is (equal '("7") captured-messages))
+             
+             ;; Test 4: Error handling
+             (setf captured-messages '())
+             (mud:process-command player "eval (/ 1 0)")
+             (is (= 1 (length captured-messages)))
+             (is (search "Error" (car captured-messages))))
+        (setf (fdefinition 'mud:player-send-message) original-send-message)))))
