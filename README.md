@@ -14,10 +14,9 @@ A MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's 
 1. [Quick Start (5 minutes)](#quick-start)
 2. [Features](#features)
 3. [Architecture](#architecture)
-4. [Project Structure](#project-structure)
-5. [Development Guide](#development-guide)
-6. [Deployment](#deployment)
-7. [Troubleshooting](#troubleshooting)
+4. [Development Guide](#development-guide)
+5. [Deployment](#deployment)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -30,13 +29,13 @@ A MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's 
 
 ### Installation
 
-```bash
-# Install dependencies (first time only)
-chmod +x setup.sh
-./setup.sh
-
+```lisp
 # Navigate to project directory
 cd musical-guacamole
+
+# In SBCL:
+(push #p"./" asdf:*central-registry*)
+(ql:quickload :mud)
 ```
 
 ### Start the Server
@@ -47,18 +46,17 @@ cd musical-guacamole
 (ql:quickload :mud)
 (mud:start-mud-server)
 ```
+Or load run-mud.lisp:
+
+```bash
+sbcl --load run-mud.lisp
+```
 
 You should see:
 ```
 [INFO] Initializing world...
 [INFO] World initialized with 2 rooms
 [INFO] MUD Server started on 127.0.0.1:8888
-```
-
-Or load run-mud.lisp:
-
-```bash
-sbcl --load run-mud.lisp
 ```
 
 ### Connect as a Player
@@ -450,7 +448,3 @@ Manually install dependencies:
 ```lisp
 (ql:quickload (list "usocket" "bordeaux-threads" "fiveam"))
 ```
-
----
-
----
