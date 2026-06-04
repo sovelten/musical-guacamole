@@ -1,19 +1,28 @@
 (in-package #:mud)
 
 ;; Player class - a specialized mud-object with network connection
-(defclass mud-player (mud-object)
-  ((socket :initarg :socket
-           :accessor player-socket
-           :documentation "Network socket for this player")
-   (inventory :initarg :inventory
-              :accessor player-inventory
+
+(defclass mud-character (mud-object)
+  ((inventory :initarg :inventory
+              :accessor character-inventory
               :initform (make-array 0 :adjustable t :fill-pointer t)
-              :documentation "Items the player carries")
+              :documentation "Items the character carries"))
+  (:documentation "A character in the MUD world"))
+
+(defclass mud-session ()
+  ((socket :initarg :socket
+           :accessor session-socket)
    (input-buffer :initarg :input-buffer
-                 :accessor player-input-buffer
-                 :initform ""
-                 :documentation "Accumulated input from the player"))
-  (:documentation "A player character in the MUD"))
+                 :accessor session-input-buffer
+                 :initform "")
+   (character :initarg :character
+              :accessor session-character
+              :initform nil
+              :documentation "The character this user is currently controlling")
+   (username :initarg :username
+             :accessor session-username
+             :initform nil))
+  (:documentation "An active network session"))
 
 (defun create-player (name socket)
   "Create a new player."
