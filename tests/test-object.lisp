@@ -34,6 +34,14 @@
     (mud:room-add-exit room1 "north" room2)
     (is (eq (mud:room-get-exit room1 "north") room2))))
 
+(test room-add-exits
+  "Test room exit management"
+  (let ((room1 (mud:create-room :name "Room 1"))
+        (room2 (mud:create-room :name "Room 2")))
+    (mud:room-add-exits room1 "north" room2 "south")
+    (is (eq (mud:room-get-exit room1 "north") room2))
+    (is (eq (mud:room-get-exit room2 "south") room1))))
+
 (test print-object-mud-object
       "Test print-object for mud-object"
       (let* ((obj (mud:create-object :name "Test Object"))

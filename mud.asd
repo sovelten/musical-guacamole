@@ -12,6 +12,7 @@
                  (:file "constants" :depends-on ("package"))
                  (:file "utils" :depends-on ("package" "constants"))
                  (:file "object" :depends-on ("package" "constants" "utils"))
+                 (:file "room" :depends-on ("object"))
                  (:file "world" :depends-on ("package" "constants" "object"))
                  (:file "player" :depends-on ("package" "constants" "object" "world"))
                  (:file "command-handler" :depends-on ("package" "constants" "player" "world"))

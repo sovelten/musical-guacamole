@@ -30,6 +30,7 @@
    #:room-remove-object
    #:room-exits
    #:room-add-exit
+   #:room-add-exits
    #:room-get-exit
    #:world-initialize
    #:world-add-room
