@@ -33,3 +33,17 @@
         (room2 (mud:create-room :name "Room 2")))
     (mud:room-add-exit room1 "north" room2)
     (is (eq (mud:room-get-exit room1 "north") room2))))
+
+(test print-object-mud-object
+      "Test print-object for mud-object"
+      (let* ((obj (mud:create-object :name "Test Object"))
+             (out (with-output-to-string (s) (print-object obj s))))
+        (is (string-equal (format nil "#<MUD:MUD-OBJECT Test Object (ID: ~D)>" (mud:object-id obj))
+                          out))))
+
+(test print-object-mud-room
+  "Test print-object for mud-room"
+  (let ((room (mud:create-room :name "Test Room")))
+    (is (string-equal
+         (format nil "#<MUD:MUD-ROOM Test Room (ID: ~D)>" (mud:object-id room))
+         (with-output-to-string (s) (print-object room s))))))

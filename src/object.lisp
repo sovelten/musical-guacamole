@@ -56,6 +56,13 @@
   "Get a description of an object."
   (format nil "~A (ID: ~D)" (object-name obj) (object-id obj)))
 
+;; Print object in REPL with useful information
+(defmethod print-object ((obj mud-object) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~A (ID: ~D)"
+            (object-name obj)
+            (object-id obj))))
+
 ;; Room class - a specialized mud-object
 (defclass mud-room (mud-object)
   ((contents :initarg :contents
