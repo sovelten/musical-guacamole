@@ -32,7 +32,7 @@
         (unwind-protect
              (progn
                (mud:world-initialize)
-               (let ((player (mud:create-player "TestPlayer" session)))
+               (let ((player (mud:create-character "TestPlayer" session)))
                  (is (not (null player)))
                  ;; Test that we can send a message without crashing
                  (mud:player-send-message player "Test message")

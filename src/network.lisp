@@ -7,6 +7,20 @@
 (defvar *player-threads* (make-hash-table :test #'equal))
 (defvar *server-lock* (bordeaux-threads:make-lock "server-lock"))
 
+(defclass mud-session ()
+  ((socket :initarg :socket
+           :accessor session-socket
+           :documentation "Network socket for this session")
+   (player :initarg :player
+           :accessor session-player
+           :initform nil
+           :documentation "Player controlled by this session")
+   (input-buffer :initarg :input-buffer
+                 :accessor session-input-buffer
+                 :initform ""
+                 :documentation "Accumulated input from the session"))
+  (:documentation "A network session in the MUD"))
+
 (defun handle-client (player)
   "Main loop for handling a client connection."
   (let ((session (player-session player)))
@@ -74,7 +88,7 @@
                       (mud.utils:log-message "New connection: ~A" player-name)
                       
                       ;; Create player
-                      (let ((player (create-player player-name session)))
+                      (let ((player (create-character player-name session)))
                         ;; Send welcome message
                         (player-send-message player "Welcome to the MUD!")
                         (player-send-message player (room-describe (object-location player)))

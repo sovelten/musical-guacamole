@@ -41,9 +41,9 @@
    #:*start-room*
    
    ;; Player system
-   #:mud-player
+   #:mud-character
    #:mud-session
-   #:create-player
+   #:create-character
    #:session-socket
    #:session-input-buffer
    #:player-session

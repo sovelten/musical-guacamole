@@ -66,7 +66,7 @@
 (defun world-get-player-in-room (room player-name)
   "Find a player in a room by name."
   (loop for obj across (room-contents room)
-        when (and (typep obj 'mud-player)
+        when (and (typep obj 'mud-character)
                   (string-equal (object-name obj) player-name))
         return obj))
 
