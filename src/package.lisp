@@ -42,8 +42,11 @@
    
    ;; Player system
    #:mud-player
+   #:mud-session
    #:create-player
-   #:player-socket
+   #:session-socket
+   #:session-input-buffer
+   #:player-session
    #:player-location
    #:player-inventory
    #:player-inventory-add

@@ -9,56 +9,57 @@
 
 (defun handle-client (player)
   "Main loop for handling a client connection."
-  (handler-case
-      (let ((socket (player-socket player)))
-        (loop while *server-running*
-              do
-              (handler-case
-                  (let ((stream (handler-case
-                                  (usocket:socket-stream socket)
-                                  (error () nil))))
-                    (if (null stream)
-                        ;; Socket is closed, exit loop
-                        (return)
-                        ;; Socket is open, continue
-                        (progn
-                          ;; Send prompt
-                          (player-send-prompt player)
-                          
-                          ;; Receive input
-                          (let ((line (read-line stream nil nil)))
-                            (if line
-                                (let ((trimmed (string-trim '(#\Return #\Newline) line)))
-                                  (when (and trimmed (> (length trimmed) 0))
-                                    (process-command player trimmed)))
-                                (progn
-                                  (mud.utils:log-message "Client ~A disconnected (EOF)" (object-name player))
-                                  (return)))))))
-                (end-of-file ()
-                  ;; Connection closed by client
-                  (mud.utils:log-message "Client ~A disconnected" (object-name player))
-                  (return))
-                (error (e)
-                  ;; Check if this is a "broken pipe" or similar connection error
-                  (let ((error-str (format nil "~A" e)))
-                    (if (or (search "Broken pipe" error-str)
-                            (search "closed" error-str))
-                        ;; Connection error, exit gracefully
-                        (progn
-                          (mud.utils:log-message "Client ~A connection lost" (object-name player))
-                          (return))
-                        ;; Other error, log it
-                        (progn
-                          (mud.utils:log-error "Error in client handler: ~A" e)
-                          (return))))))))
-    (error (e)
-      (mud.utils:log-error "Client handler error for ~A: ~A" (object-name player) e)))
-  
-  ;; Cleanup when disconnected
-  (let ((player-id (object-id player)))
-    (mud.utils:log-message "Attempting to remove thread for player ~A" player-id)
-    (remhash player-id *player-threads*))
-  (player-disconnect player))
+  (let ((session (player-session player)))
+    (handler-case
+        (let ((socket (session-socket session)))
+          (loop while *server-running*
+                do
+                (handler-case
+                    (let ((stream (handler-case
+                                    (usocket:socket-stream socket)
+                                    (error () nil))))
+                      (if (null stream)
+                          ;; Socket is closed, exit loop
+                          (return)
+                          ;; Socket is open, continue
+                          (progn
+                            ;; Send prompt
+                            (player-send-prompt player)
+                            
+                            ;; Receive input
+                            (let ((line (read-line stream nil nil)))
+                              (if line
+                                  (let ((trimmed (string-trim '(#\Return #\Newline) line)))
+                                    (when (and trimmed (> (length trimmed) 0))
+                                      (process-command player trimmed)))
+                                  (progn
+                                    (mud.utils:log-message "Client ~A disconnected (EOF)" (object-name player))
+                                    (return)))))))
+                  (end-of-file ()
+                    ;; Connection closed by client
+                    (mud.utils:log-message "Client ~A disconnected" (object-name player))
+                    (return))
+                  (error (e)
+                    ;; Check if this is a "broken pipe" or similar connection error
+                    (let ((error-str (format nil "~A" e)))
+                      (if (or (search "Broken pipe" error-str)
+                              (search "closed" error-str))
+                          ;; Connection error, exit gracefully
+                          (progn
+                            (mud.utils:log-message "Client ~A connection lost" (object-name player))
+                            (return))
+                          ;; Other error, log it
+                          (progn
+                            (mud.utils:log-error "Error in client handler: ~A" e)
+                            (return))))))))
+      (error (e)
+        (mud.utils:log-error "Client handler error for ~A: ~A" (object-name player) e)))
+    
+    ;; Cleanup when disconnected
+    (let ((player-id (object-id player)))
+      (mud.utils:log-message "Attempting to remove thread for player ~A" player-id)
+      (remhash player-id *player-threads*))
+    (player-disconnect player)))
 
 (defun accept-connections ()
   "Accept incoming client connections."
@@ -68,11 +69,12 @@
             (handler-case
                 (let ((client-socket (usocket:socket-accept *server-socket*)))
                   (when client-socket
-                    (let ((player-name (format nil "Player~D" (random 10000))))
+                    (let ((player-name (format nil "Player~D" (random 10000)))
+                          (session (make-instance 'mud-session :socket client-socket)))
                       (mud.utils:log-message "New connection: ~A" player-name)
                       
                       ;; Create player
-                      (let ((player (create-player player-name client-socket)))
+                      (let ((player (create-player player-name session)))
                         ;; Send welcome message
                         (player-send-message player "Welcome to the MUD!")
                         (player-send-message player (room-describe (object-location player)))
@@ -132,7 +134,7 @@
       ;; Wait for acceptance thread to exit
       (when *acceptance-thread*
         (handler-case
-            (bordeaux-threads:join-thread *acceptance-thread* :timeout 5)
+            (bordeaux-threads:join-thread *acceptance-thread*)
           (error (e)
             (mud.utils:log-error "Error joining acceptance thread: ~A" e)))
         (setf *acceptance-thread* nil))
