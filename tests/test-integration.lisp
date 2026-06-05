@@ -16,7 +16,8 @@
   (handler-case
       (progn
         ;; Create a player without a real socket
-        (let ((player (mud:create-player "TestPlayer" nil)))
+        (let ((session (make-instance 'mud:mud-session :socket nil))
+              (player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
           ;; Test that the player was created
           (is (equal (mud:object-name player) "TestPlayer"))
           ;; Test that the player is in a room
@@ -33,7 +34,8 @@
   "Test that socket errors are handled gracefully"
   (handler-case
       (progn
-        (let ((player (mud:create-player "TestPlayer" nil)))
+        (let ((session (make-instance 'mud:mud-session :socket nil))
+              (player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
           ;; Sending message to player with nil socket should not crash
           (mud:player-send-message player "Test message")
           (is (not (null player)))))
@@ -46,11 +48,12 @@
   (handler-case
       (progn
         ;; Simulate creating and disconnecting a player
-        (let ((player (mud:create-player "DisconnectTest" nil)))
+        (let* ((session (make-instance 'mud:mud-session :socket nil))
+               (player (mud:create-character "DisconnectTest" session)))
           ;; Verify player was created
           (is (equal (mud:object-name player) "DisconnectTest"))
           ;; Simulate disconnect by setting socket to nil
-          (setf (mud:player-socket player) nil)
+          (setf (mud:session-socket session) nil)
           ;; Try to send message - should not crash or loop
           (mud:player-send-message player "Test after disconnect")
           ;; Player disconnect should work gracefully
@@ -62,15 +65,17 @@
 (test player-removal-from-world
   "Test that player is removed from world data structures on disconnect"
   (let* ((room (mud:create-room :name "Test Room"))
-         (player (mud:create-player "TestRemovePlayer" nil)))
-    (setf (mud:object-location player) room)
-    (mud:room-add-object room player)
-    
-    (is (find player (mud:room-contents room)))
-    (is (gethash (mud:object-id player) mud:*players*))
-    
-    (mud:player-disconnect player)
-    
-    (is (not (find player (mud:room-contents room))))
-    (is (not (gethash (mud:object-id player) mud:*players*)))))
+         (session (make-instance 'mud:mud-session :socket nil))
+         (character (mud:create-character "TestRemovePlayer" session)))
 
+    (mud:world-new-character character)
+    (setf (mud:object-location character) room)
+    (mud:room-add-object room character)
+    
+    (is (find character (mud:room-contents room)))
+    (is (gethash (mud:object-id character) mud:*players*))
+    
+    (mud:player-disconnect character)
+    
+    (is (not (find character (mud:room-contents room))))
+    (is (not (gethash (mud:object-id character) mud:*players*)))))

@@ -33,6 +33,7 @@
    #:room-add-exits
    #:room-get-exit
    #:world-initialize
+   #:world-new-character
    #:world-add-room
    #:world-get-room
    #:world-all-rooms
@@ -41,9 +42,12 @@
    #:*start-room*
    
    ;; Player system
-   #:mud-player
-   #:create-player
-   #:player-socket
+   #:mud-character
+   #:mud-session
+   #:create-character
+   #:session-socket
+   #:session-input-buffer
+   #:player-session
    #:player-location
    #:player-inventory
    #:player-inventory-add
