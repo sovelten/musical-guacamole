@@ -50,6 +50,12 @@
   "Add a player to the world."
   (setf (gethash (object-id player) *players*) player))
 
+(defun world-new-character (character)
+  "Add a character to the world."
+  (when *start-room*
+      (room-add-object *start-room* character))
+  (world-add-player character))
+
 (defun world-remove-player (player-id)
   "Remove a player from the world."
   (remhash player-id *players*))

@@ -11,15 +11,41 @@
   ((socket :initarg :socket
            :accessor session-socket
            :documentation "Network socket for this session")
-   (player :initarg :player
-           :accessor session-player
-           :initform nil
-           :documentation "Player controlled by this session")
-   (input-buffer :initarg :input-buffer
-                 :accessor session-input-buffer
-                 :initform ""
-                 :documentation "Accumulated input from the session"))
+   (character :initarg :player
+              :accessor session-character
+              :initform nil
+              :documentation "Player controlled by this session"))
   (:documentation "A network session in the MUD"))
+
+(defun session-disconnect (session)
+  (when (and session (session-socket session))
+    (handler-case
+        (usocket:socket-close (session-socket session))
+      (error (e)
+        (mud.utils:log-error "Error closing socket for ~A: ~A"
+                             (session-socket session) e)))))
+
+(defun session-send-message (session message &key (newline t))
+  "Send a message to a session. If NEWLINE is nil, don't add a trailing newline."
+  (when session
+    (handler-case
+        (let ((stream (usocket:socket-stream (session-socket session))))
+          (when stream
+            (if newline
+                (format stream "~A~%" message)
+                (format stream "~A" message))
+            (force-output stream)))
+      (error (e)
+        ;; Only log if it's not a connection error
+        (let ((error-str (format nil "~A" e)))
+          (unless (or (search "Broken pipe" error-str)
+                      (search "closed" error-str))
+            (mud.utils:log-error "Failed to send message to session ~A: ~A"
+                                 (session-socket session) e)))))))
+
+(defun session-send-prompt (session)
+  "Send a prompt to a player on the same line (no newline)."
+  (session-send-message session "> " :newline nil))
 
 (defun handle-client (player)
   "Main loop for handling a client connection."
@@ -38,7 +64,7 @@
                           ;; Socket is open, continue
                           (progn
                             ;; Send prompt
-                            (player-send-prompt player)
+                            (session-send-prompt session)
                             
                             ;; Receive input
                             (let ((line (read-line stream nil nil)))
@@ -80,29 +106,26 @@
   (handler-case
       (loop while *server-running*
             do
-            (handler-case
-                (let ((client-socket (usocket:socket-accept *server-socket*)))
-                  (when client-socket
-                    (let ((player-name (format nil "Player~D" (random 10000)))
-                          (session (make-instance 'mud-session :socket client-socket)))
-                      (mud.utils:log-message "New connection: ~A" player-name)
-                      
-                      ;; Create player
-                      (let ((player (create-character player-name session)))
-                        ;; Send welcome message
-                        (player-send-message player "Welcome to the MUD!")
-                        (player-send-message player (room-describe (object-location player)))
-                        
-                        ;; Start player thread
-                        (let ((thread (bordeaux-threads:make-thread
-                                      (lambda () (handle-client player))
-                                      :name (format nil "player-~A" (object-id player)))))
-                          (setf (gethash (object-id player) *player-threads*) thread))))))
-              (usocket:timeout-error ()
-                ;; Just a timeout, continue accepting
-                nil)
-              (error (e)
-                (mud.utils:log-error "Error accepting connection: ~A" e))))
+               (handler-case
+                   (let ((client-socket (usocket:socket-accept *server-socket*)))
+                     (when client-socket
+                       (let* ((guest-name (format nil "Guest~D" (random 10000)))
+                              (session (make-instance 'mud-session :socket client-socket))
+                              (character (create-character guest-name session)))
+                         (mud.utils:log-message "New connection: ~A" guest-name)
+                         (session-send-message session "Welcome to the MUD!")
+                         (world-new-character character)
+                         (session-send-message session (room-describe (object-location character)))
+                         ;; Start session thread
+                         (let ((thread (bordeaux-threads:make-thread
+                                        (lambda () (handle-client character))
+                                        :name (format nil "player-~A" (object-id character)))))
+                           (setf (gethash (object-id character) *player-threads*) thread)))))
+                 (usocket:timeout-error ()
+                   ;; Just a timeout, continue accepting
+                   nil)
+                 (error (e)
+                   (mud.utils:log-error "Error accepting connection: ~A" e))))
     (error (e)
       (mud.utils:log-error "Accept connections error: ~A" e))))
 

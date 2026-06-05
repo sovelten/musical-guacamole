@@ -68,7 +68,7 @@
         (let ((room (object-location player)))
           (player-send-message player (format nil "You say: ~A" message))
           (loop for obj across (room-contents room) do
-            (when (and (typep obj 'mud-player)
+            (when (and (typep obj 'mud-character)
                        (not (eq obj player)))
               (player-send-message obj 
                                   (format nil "~A says: ~A" 

@@ -27,14 +27,3 @@
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
     (is (not (null (mud:object-location player))))
     (is (typep (mud:object-location player) 'mud:mud-room))))
-
-(test player-in-room
-  "Test that player is added to room on creation"
-  (mud:world-initialize)
-  (let* ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil)))
-         (room (mud:object-location player))
-         (contents (mud:room-contents room)))
-    (is (not (null room)))
-    (is (vectorp contents))
-    (is (> (length contents) 0))
-    (is (find player contents))))

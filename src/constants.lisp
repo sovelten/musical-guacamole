@@ -12,7 +12,7 @@
 ;; Object type constants
 (defconstant +object-type-generic+ 'generic)
 (defconstant +object-type-room+ 'room)
-(defconstant +object-type-player+ 'character)
+(defconstant +object-type-character+ 'character)
 (defconstant +object-type-item+ 'item)
 
 ;; Command constants

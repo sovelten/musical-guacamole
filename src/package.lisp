@@ -33,6 +33,7 @@
    #:room-add-exits
    #:room-get-exit
    #:world-initialize
+   #:world-new-character
    #:world-add-room
    #:world-get-room
    #:world-all-rooms

@@ -66,14 +66,16 @@
   "Test that player is removed from world data structures on disconnect"
   (let* ((room (mud:create-room :name "Test Room"))
          (session (make-instance 'mud:mud-session :socket nil))
-         (player (mud:create-character "TestRemovePlayer" session)))
-    (setf (mud:object-location player) room)
-    (mud:room-add-object room player)
+         (character (mud:create-character "TestRemovePlayer" session)))
+
+    (mud:world-new-character character)
+    (setf (mud:object-location character) room)
+    (mud:room-add-object room character)
     
-    (is (find player (mud:room-contents room)))
-    (is (gethash (mud:object-id player) mud:*players*))
+    (is (find character (mud:room-contents room)))
+    (is (gethash (mud:object-id character) mud:*players*))
     
-    (mud:player-disconnect player)
+    (mud:player-disconnect character)
     
-    (is (not (find player (mud:room-contents room))))
-    (is (not (gethash (mud:object-id player) mud:*players*)))))
+    (is (not (find character (mud:room-contents room))))
+    (is (not (gethash (mud:object-id character) mud:*players*)))))
