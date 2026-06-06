@@ -80,8 +80,6 @@ telnet localhost 8888
 | `quit` | `quit` | Disconnect |
 | `eval` | `eval <sexpr>` | Run arbritrary lisp code!!! (very dangerous) |
 
-```
-
 ### Example Session 
 
 Using eval to create a room:
@@ -94,7 +92,6 @@ What is your name?
 
 You see:
   - Frodo (ID: 4)
-
 
 Exits: north
 
@@ -113,18 +110,15 @@ Welcome to the MUD!
 You see:
   - Frodo (ID: 4)
 
-
 Exits: north, west
 
 > go west
 You go west.
 
-
 === Valinor ===
 
 You see:
   - Frodo (ID: 4)
-
 
 Exits: east
 
