@@ -59,15 +59,15 @@
 (defun world-remove-player (player)
   "Remove a player from the world."
   (mud.utils:log-message "Character ~A leaving" (object-name player))
-  (let ((room (object-location player))
-        (session (player-session player)))
+  (let ((room (object-location player)))
+    (mud.utils:log-message "Removing from ~A" (object-name room))
     ;; Remove from room
     (when (typep room 'mud-room)
       (room-remove-object room player))
     ;; Remove from world
+    (mud.utils:log-message "Removing ~A from world" (object-name player))
     (remhash (object-id player) *players*)
-    ;; Close socket if it exists
-    (session-disconnect session)))
+    (mud.utils:log-message "Removed")))
 
 (defun world-get-player (player-id)
   "Get a player by ID."

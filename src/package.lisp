@@ -48,7 +48,7 @@
    #:create-character
    #:session-socket
    #:session-input-buffer
-   #:player-session
+   #:character-session
    #:player-location
    #:player-inventory
    #:character-inventory-add

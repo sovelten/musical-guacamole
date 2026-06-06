@@ -3,7 +3,7 @@
 ;; TODO: split character and player-character for building NPCs
 (defclass mud-character (mud-object)
   ((session :initarg :session
-            :accessor player-session
+            :accessor character-session
             :initform nil
             :documentation "The session controlling this character")
    (inventory :initarg :inventory
@@ -34,7 +34,7 @@
 
 (defun player-send-message (player message &key (newline t))
   "Send a message to a player. If NEWLINE is nil, don't add a trailing newline."
-  (let ((session (player-session player)))
+  (let ((session (character-session player)))
     (session-send-message session message)))
 
 (defun player-send-prompt (player)

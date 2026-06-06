@@ -20,9 +20,6 @@
 
 (defun session-disconnect (session)
   (when (and session (session-socket session))
-    (if (session-character session)
-        (c)
-        )
     (handler-case
         (usocket:socket-close (session-socket session))
       (error (e)

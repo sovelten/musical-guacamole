@@ -82,8 +82,9 @@
   ;; Cleanup when disconnected
   (let ((session-id (session-id session)))
     (mud.utils:log-message "Attempting to remove thread for session ~A" session-id)
-    (remhash session-id *player-threads*))
-  (world-remove-player (session-character session)))
+    (remhash session-id *player-threads*)
+    (world-remove-player (session-character session))
+    (session-disconnect session)))
 
 (defun accept-connections ()
   "Accept incoming client connections."
@@ -157,7 +158,8 @@
       
       ;; Disconnect all players
       (dolist (player (world-all-players))
-        (world-remove-player player))
+        (progn (world-remove-player player)
+               (session-disconnect (character-session player))))
       
       (mud.utils:log-message "MUD Server stopped")
       t)))
