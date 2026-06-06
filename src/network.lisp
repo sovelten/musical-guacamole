@@ -7,18 +7,67 @@
 (defvar *player-threads* (make-hash-table :test #'equal))
 (defvar *server-lock* (bordeaux-threads:make-lock "server-lock"))
 
+(defun read-line-with-timeout (socket &optional (timeout 300))
+  "Read a line from socket stream with a timeout in seconds.
+   Returns (values line status), where status is nil for success,
+   :timeout for timeout, and :eof for connection closed."
+  (if (null socket)
+      (values nil :eof)
+      (let ((ready (handler-case (usocket:wait-for-input socket :timeout timeout :ready-only t)
+                     (error () nil))))
+        (if (null ready)
+            (values nil :timeout)
+            (let ((stream (handler-case (usocket:socket-stream socket) (error () nil))))
+              (if (null stream)
+                  (values nil :eof)
+                  (handler-case
+                      (let ((line (read-line stream nil nil)))
+                        (if line
+                            (values line nil)
+                            (values nil :eof)))
+                    (error (e)
+                      (values nil e)))))))))
+
+(defun send-keepalive (socket)
+  "Send a harmless carriage return to the client to trigger TCP transmission.
+   If the socket's connection has been lost, this write or its flush will signal an error."
+  (when socket
+    (let ((stream (usocket:socket-stream socket)))
+      (when stream
+        (write-char #\Return stream)
+        (force-output stream)))))
+
+(defun read-line-with-timeout-loop (socket &key (poll-interval 30) (keepalive-func nil))
+  "Read a line from socket stream by polling with a short timeout (POLL-INTERVAL).
+   If polling times out, it invokes KEEPALIVE-FUNC (e.g., to send a keepalive probe)
+   to verify if the connection is still alive, and then continues waiting.
+   This allows players to stay connected indefinitely while actively detecting broken connections."
+  (loop
+     (multiple-value-bind (line status) (read-line-with-timeout socket poll-interval)
+       (cond
+         ((null status)
+          (return (values line nil)))
+         ((eq status :timeout)
+          (if keepalive-func
+              (handler-case
+                  (progn
+                    (funcall keepalive-func)
+                    nil)
+                (error (e)
+                  (return (values nil e))))
+              nil))
+         (t
+          (return (values nil status)))))))
+
 (defun ask-name (session default)
   (session-send-message session "What is your name?")
-  (let* ((socket (session-socket session))
-         (stream (handler-case (usocket:socket-stream socket) (error () nil))))
-    (if (null stream)
-        ;; Socket is closed, exit loop
+  (let ((socket (session-socket session)))
+    (if (null socket)
         default
-        ;; Socket is open, continue
         (progn
           (session-send-prompt session)
-          (let ((line (read-line stream nil nil)))
-            (if line
+          (multiple-value-bind (line status) (read-line-with-timeout socket 300)
+            (if (and line (null status))
                 (let ((trimmed (string-trim '(#\Return #\Newline) line)))
                   (if (and trimmed (> (length trimmed) 0))
                       trimmed
@@ -39,26 +88,26 @@
           (loop while *server-running*
                 do
                    (handler-case
-                       (let ((stream (handler-case
-                                         (usocket:socket-stream socket)
-                                       (error () nil))))
-                         (if (null stream)
-                             ;; Socket is closed, exit loop
-                             (return)
-                             ;; Socket is open, continue
-                             (progn
-                               ;; Send prompt
-                               (session-send-prompt session)
+                       (progn
+                         ;; Send prompt
+                         (session-send-prompt session)
 
-                               ;; Receive input
-                               (let ((line (read-line stream nil nil)))
-                                 (if line
-                                     (let ((trimmed (string-trim '(#\Return #\Newline) line)))
-                                       (when (and trimmed (> (length trimmed) 0))
-                                         (process-command character trimmed)))
-                                     (progn
-                                       (mud.utils:log-message "Client ~A disconnected (EOF)" char-name)
-                                       (return)))))))
+                         ;; Receive input with a 10-minute timeout
+                         (multiple-value-bind (line status) (read-line-with-timeout socket 600)
+                           (cond
+                             ((eq status :timeout)
+                              (session-send-message session "Timed out due to inactivity.")
+                              (mud.utils:log-message "Client ~A timed out due to inactivity" char-name)
+                              (return))
+                             ((or (eq status :eof) (typep status 'error))
+                              (mud.utils:log-message "Client ~A disconnected" char-name)
+                              (return))
+                             (line
+                              (let ((trimmed (string-trim '(#\Return #\Newline) line)))
+                                (when (and trimmed (> (length trimmed) 0))
+                                  (process-command character trimmed))))
+                             (t
+                              (return)))))
                      (end-of-file ()
                        ;; Connection closed by client
                        (mud.utils:log-message "Client ~A disconnected" char-name)
