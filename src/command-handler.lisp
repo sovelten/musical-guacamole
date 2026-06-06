@@ -92,7 +92,7 @@
 (define-command "quit" (player args)
   (declare (ignore args))
   (player-send-message player "Goodbye!")
-  (player-disconnect player))
+  (world-remove-player player))
 
 (defun parse-command (input)
   "Parse a command string into command name and raw args string.

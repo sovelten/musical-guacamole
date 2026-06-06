@@ -57,7 +57,7 @@
           ;; Try to send message - should not crash or loop
           (mud:player-send-message player "Test after disconnect")
           ;; Player disconnect should work gracefully
-          (mud:player-disconnect player)
+          (mud:world-remove-player player)
           (is (not (null player)))))
     (error (e)
       (fail (format nil "Graceful disconnection failed: ~A" e)))))
@@ -75,7 +75,7 @@
     (is (find character (mud:room-contents room)))
     (is (gethash (mud:object-id character) mud:*players*))
     
-    (mud:player-disconnect character)
+    (mud:world-remove-player character)
     
     (is (not (find character (mud:room-contents room))))
     (is (not (gethash (mud:object-id character) mud:*players*)))))
