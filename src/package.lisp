@@ -23,6 +23,7 @@
    #:object-describe
    
    ;; World system
+   #:get-config-key
    #:mud-room
    #:create-room
    #:room-contents
@@ -32,15 +33,15 @@
    #:room-add-exit
    #:room-add-exits
    #:room-get-exit
-   #:world-initialize
+   #:world-restore-or-initialize
    #:world-new-character
    #:world-add-room
    #:world-get-player
    #:world-get-room
    #:world-all-rooms
-   #:*world*
+   #:total-rooms
    #:*players*
-   #:*start-room*
+   #:*system*
    
    ;; Player system
    #:mud-character

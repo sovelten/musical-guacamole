@@ -183,7 +183,7 @@
           (return-from start-mud-server nil))
         (progn
           ;; Initialize world
-          (world-initialize)
+          (world-restore-or-initialize)
           
           ;; Create server socket
           (setf *server-socket* (usocket:socket-listen host port 
@@ -242,5 +242,5 @@
   "Get the current status of the server."
   (format nil "Server running: ~A~%Players online: ~D~%Rooms in world: ~D~%"
           (if *server-running* "Yes" "No")
-          (hash-table-count *players*)
-          (hash-table-count *world*)))
+          (total-players)
+          (total-rooms)))

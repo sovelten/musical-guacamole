@@ -1,7 +1,7 @@
 (in-package #:mud)
 
 ;; Room class - a specialized mud-object
-(defclass mud-room (mud-object)
+(defclass mud-room (mud-object cl-prevalence:object-with-id)
   ((contents :initarg :contents
              :accessor room-contents
              :initform (make-array 0 :adjustable t :fill-pointer t)
