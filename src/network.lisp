@@ -143,7 +143,7 @@
     (mud.utils:log-message "Attempting to remove thread for session ~A" session-id)
     (remhash session-id *player-threads*)
     (when (session-character session)
-      (world-remove-player (session-character session)))
+      (remove-character (session-character session)))
     (session-disconnect session)))
 
 (defun accept-connections ()
@@ -224,8 +224,8 @@
         (setf *acceptance-thread* nil))
       
       ;; Disconnect all players
-      (dolist (player (world-all-players))
-        (progn (world-remove-player player)
+      (dolist (player (characters))
+        (progn (remove-character player)
                (session-disconnect (character-session player))))
       
       (mud.utils:log-message "MUD Server stopped")

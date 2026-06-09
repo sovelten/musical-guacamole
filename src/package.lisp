@@ -37,9 +37,9 @@
    #:world-restore-or-initialize
    #:world-new-character
    #:world-add-room
-   #:world-get-player
-   #:world-get-room
-   #:world-all-rooms
+   #:character-by-id
+   #:room-by-id
+   #:rooms
    #:total-rooms
    #:*players*
    #:*system*
@@ -57,7 +57,7 @@
    #:character-inventory-remove
    #:player-send-message
    #:player-send-prompt
-   #:world-remove-player
+   #:remove-character
    
    ;; Command system
    #:process-command
