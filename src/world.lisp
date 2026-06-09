@@ -80,14 +80,25 @@
 (defun rooms ()
   "Get all rooms in the world."
   (let ((rooms (cl-prevalence:get-root-object *system* :rooms)))
-    (loop for room being the hash-values of rooms
-          collect room)))
+    (if rooms
+        (loop for room being the hash-values of rooms
+              collect room)
+        nil)))
 
 (defun get-config-key (system key)
   (gethash key (cl-prevalence:get-root-object system :config)))
 
 (defun starting-room (system)
   (room-by-id (get-config-key system :starting-room-id)))
+
+(defun find-max-id ()
+  "Find the maximum ID among all loaded rooms and their nested contents."
+  (let ((max-id 0))
+    (dolist (room (rooms))
+      (setf max-id (max max-id (object-id room)))
+      (loop for obj across (room-contents room)
+            do (setf max-id (max max-id (object-id obj)))))
+    max-id))
 
 (defun world-restore-or-initialize (&key force-new (location *system-location*))
   "Restore the world from prevalence or initialize a new one.
@@ -105,7 +116,9 @@ If FORCE-NEW is true, any existing persisted data is cleared first."
       (room-add-exit forest "south" tavern)
       (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room tavern t))
       (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room forest))
-      (when *debug-mode* (mud.utils:log-message "Rooms created!")))))
+      (when *debug-mode* (mud.utils:log-message "Rooms created!"))))
+  ;; Initialize / restore ID counter to the maximum of currently allocated IDs
+  (setf mud.utils::*id-counter* (max mud.utils::*id-counter* (find-max-id))))
 
 (defun world-new-character (character)
   "Add a character to the world."
