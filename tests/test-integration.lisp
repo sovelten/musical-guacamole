@@ -18,6 +18,7 @@
         ;; Create a player without a real socket
         (let ((session (make-instance 'mud:mud-session :socket nil))
               (player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+          (mud:world-new-character player)
           ;; Test that the player was created
           (is (equal (mud:object-name player) "TestPlayer"))
           ;; Test that the player is in a room
@@ -50,6 +51,7 @@
         ;; Simulate creating and disconnecting a player
         (let* ((session (make-instance 'mud:mud-session :socket nil))
                (player (mud:create-character "DisconnectTest" session)))
+          (mud:world-new-character player)
           ;; Verify player was created
           (is (equal (mud:object-name player) "DisconnectTest"))
           ;; Simulate disconnect by setting socket to nil

@@ -6,6 +6,7 @@
   "Test the look command"
   (mud:world-restore-or-initialize)
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+    (mud:world-new-character player)
     ;; The look command should work without crashing
     (mud:process-command player "look")
     (is (not (null player)))))
@@ -14,6 +15,7 @@
   "Test the help command"
   (mud:world-restore-or-initialize)
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+    (mud:world-new-character player)
     (mud:process-command player "help")
     (is (not (null player)))))
 
@@ -21,6 +23,7 @@
   "Test the exits command"
   (mud:world-restore-or-initialize)
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+    (mud:world-new-character player)
     (mud:process-command player "exits")
     (is (not (null player)))))
 
@@ -28,6 +31,7 @@
   "Test the inventory command"
   (mud:world-restore-or-initialize)
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+    (mud:world-new-character player)
     (mud:process-command player "inventory")
     (is (not (null player)))))
 
@@ -35,6 +39,7 @@
   "Test the go command"
   (mud:world-restore-or-initialize)
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+    (mud:world-new-character player)
     (let ((start-room (mud:object-location player)))
       ;; Try to go north (should work from starting room)
       (mud:process-command player "go north")
@@ -45,6 +50,7 @@
   "Test unknown command handling"
   (mud:world-restore-or-initialize)
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+    (mud:world-new-character player)
     ;; Unknown command should not crash
     (mud:process-command player "blahblah")
     (is (not (null player)))))
@@ -54,6 +60,7 @@
   (mud:world-restore-or-initialize)
   (let ((player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil)))
         (captured-messages '()))
+    (mud:world-new-character player)
     (let ((original-send-message (fdefinition 'mud:player-send-message)))
       (unwind-protect
            (progn

@@ -61,12 +61,14 @@
 (defun tx-new-character (system character)
   "Add a character to the world."
   (let ((room (starting-room system)))
+    (setf (object-location character) room)
     (room-add-object room character)
     (world-add-player character)))
 
 (defun world-new-character (character)
   "Add a character to the world."
   (let ((room (starting-room *system*)))
+    (setf (object-location character) room)
     (room-add-object room character)
     (world-add-player character)))
 
