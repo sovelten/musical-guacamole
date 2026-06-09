@@ -17,17 +17,17 @@
       (progn
         ;; Create a player without a real socket
         (let ((session (make-instance 'mud:mud-session :socket nil))
-              (player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-          (mud:world-new-character player)
-          ;; Test that the player was created
-          (is (equal (mud:object-name player) "TestPlayer"))
-          ;; Test that the player is in a room
-          (is (not (null (mud:object-location player))))
-          ;; Test that we can process commands without crashing
-          (mud:process-command player "look")
-          (mud:process-command player "help")
-          (mud:process-command player "exits")
-          (is (not (null player)))))
+              (player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil)))))
+        (mud:world-new-character player)
+        ;; Test that the player was created
+        (is (equal (mud:object-name player) "TestPlayer"))
+        ;; Test that the player is in a room
+        (is (not (null (mud:object-location player))))
+        ;; Test that we can process commands without crashing
+        (mud:process-command player "look")
+        (mud:process-command player "help")
+        (mud:process-command player "exits")
+        (is (not (null player)))))
     (error (e)
       (fail (format nil "Player connection simulation failed: ~A" e)))))
 
