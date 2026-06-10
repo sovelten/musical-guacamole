@@ -2,7 +2,13 @@
 
 A MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's Game Driver (DGD) and LMUD, with the added reckless capability of running lisp code at your own risk and peril (don't start a real server with this on the internet). The name was inspired by the first repository name that github suggested to me.
 
-Very simple and raw at the moment, but the fact that it runs on lisp gives it some super powers, such as the ability to change the running image within the session.
+Very simple and raw at the moment, but the fact that it runs on lisp gives it some super powers, such as the ability to update the running image within the session.
+
+## Key Design Principles
+
+1. **Persistent Objects** - Game objects are persisted and changes are logged to enable recovery.
+2. **All power to the user** - You can eval lisp code directly within the game (could/should be restricted to admins in the future)
+3. **Hot Reloading** - No need to ever shut the server down for maintenance (WIP)
 
 ## Inspiration
 
@@ -158,75 +164,6 @@ In the SBCL REPL:
 - **LLM NPCs** - What if we put in some llms armed with some mcp servers to interact in the world?
 
 ---
-
-## Architecture
-
-### Core System Components
-
-#### Object System (`src/object.lisp`)
-Everything in the MUD is a `mud-object`:
-- **Unique ID**: Auto-generated, thread-safe
-- **Name**: Display name
-- **Type**: Classification (room, player, item, etc.)
-- **Location**: Where the object is
-- **Properties**: Extensible hash-table for custom data
-
-#### Room System
-Rooms are specialized objects:
-- **Contents**: Array of objects in the room
-- **Exits**: Hash map of directional exits (north → room-id, etc.)
-- **Description**: Room appearance
-
-#### Player System (`src/player.lisp`)
-Players are specialized objects:
-- **Socket**: Network connection to client
-- **Inventory**: Array of carried objects
-- **Location**: Current room
-
-#### Command System (`src/command-handler.lisp`)
-Simple macro-based command definition:
-```lisp
-(define-command "command-name" (player args)
-  ;; Command implementation
-  )
-```
-
-#### World System (`src/world.lisp`)
-Global state management:
-- Room registry and lookup
-- Player tracking
-- Message broadcasting
-- World initialization
-
-#### Network System (`src/network.lisp`)
-- TCP server (default: 127.0.0.1:8888)
-- Accepts incoming connections
-- Per-player threading
-- Socket management and cleanup
-
-### Data Flow: Command Processing
-
-```
-Telnet Input ("go north")
-  ↓
-parse-command: Extract command and arguments
-  ↓
-process-command: Lookup handler in *commands* hash table
-  ↓
-Execute Handler: "go" command runs
-  ├─ Get current room
-  ├─ Look up exit
-  ├─ Move player
-  └─ Send messages
-  ↓
-Telnet Output: Room description + prompt
-```
-
-### Key Design Principles
-
-1. **Persistent Objects** - Game objects are persisted and changes are logged to enable recovery.
-2. **All power to the user** - You can eval lisp code directly within the game (could/should be restricted to admins in the future)
-3. **Hot Reloading** - No need to ever shut the server down for maintenance (WIP)
 
 ## Development Guide
 
