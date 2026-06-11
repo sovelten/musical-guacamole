@@ -20,6 +20,16 @@
                  :type +object-type-room+
                  :location nil))
 
+(defun exits-as-objects (room)
+  (loop :for exit-name :being :the :hash-key
+          :using (hash-value v) :of (room-exits room)
+        :collect
+        (room-add-object (new-room :name exit-name) v)))
+
+(defun storify (room)
+  (let ((inside (new-room :name (format nil "Inside ~A" (object-name room)))))
+    inside))
+
 (defun room-add-object (room obj)
   "Add an object to a room."
   (let ((contents (room-contents room)))
