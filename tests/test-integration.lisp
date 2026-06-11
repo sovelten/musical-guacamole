@@ -1,4 +1,4 @@
-(in-package #:mud.tests)
+(in-package #:mud-test)
 
 (in-suite mud-tests)
 

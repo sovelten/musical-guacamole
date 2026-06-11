@@ -1,8 +1,8 @@
-(defpackage #:mud.tests
+(defpackage #:mud-test
   (:use #:cl #:fiveam)
   (:export #:run-tests #:mud-tests))
 
-(in-package #:mud.tests)
+(in-package #:mud-test)
 
 (def-suite mud-tests :description "Tests for the MUD server")
 

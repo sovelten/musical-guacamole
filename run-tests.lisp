@@ -13,7 +13,7 @@
 
 ;; Run the tests
 (format t "~%=== Running MUD Tests ===~%~%")
-(mud.tests:run-tests)
+(mud-test:run-tests)
 (format t "~%=== Tests Complete ===~%~%")
 
 ;; Exit cleanly
