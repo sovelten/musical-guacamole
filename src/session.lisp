@@ -54,7 +54,6 @@
 
 (defun ask-input (session question &optional (default ""))
   (session-send-message session question)
-  (session-send-prompt session)
   (let ((socket (session-socket session)))
     (multiple-value-bind (line status) (read-line-with-timeout socket 300)
       (if (and line (null status))

@@ -102,11 +102,6 @@
            (let ((line1 (read-line client-stream nil nil)))
              (is (equal line1 "What is your name?")))
            
-           ;; Read prompt "> "
-           (let ((prompt (make-string 2)))
-             (read-sequence prompt client-stream)
-             (is (equal prompt "> ")))
-           
            ;; Send player name
            (write-line "QuitTestPlayer" client-stream)
            (force-output client-stream)
@@ -168,11 +163,6 @@
            ;; Server should ask for name
            (let ((line1 (read-line client-stream nil nil)))
              (is (equal line1 "What is your name?")))
-           
-           ;; Read prompt "> "
-           (let ((prompt (make-string 2)))
-             (read-sequence prompt client-stream)
-             (is (equal prompt "> ")))
            
            ;; Send player name
            (write-line "AbruptPlayer" client-stream)
