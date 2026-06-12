@@ -150,7 +150,7 @@ If FORCE-NEW is true, any existing persisted data is cleared first."
   (unless (cl-prevalence:get-root-object *system* :rooms)
     (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-system))
     (when *debug-mode* (mud.utils:log-message "Initializing world..."))
-    (let ((tavern (new-room :name "The Tavern" :description "There is a guestbook on top of a table. Hint: \"write <message>\" will register an entry on the guestbook."))
+    (let ((tavern (new-room :name "The Tavern" :description "There is a guestbook on top of a table. Hint: type \"write\" to write an entry on the guestbook."))
           (forest (new-room :name "A Dense Forest"))
           (guestbook (new-guestbook :name "a guestbook")))
       (room-add-object tavern guestbook)
