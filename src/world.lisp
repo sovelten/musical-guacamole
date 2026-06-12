@@ -60,13 +60,14 @@
 
 (defun tx-create-system (system)
   (setf (cl-prevalence:get-root-object system :rooms) (make-hash-table))
+  (setf (cl-prevalence:get-root-object system :objects) (make-hash-table))
   (setf (cl-prevalence:get-root-object system :config) (make-hash-table))
   (setf (cl-prevalence:get-root-object system :id-counter) 0))
 
-(defun tx-create-object (system object &optional starting?)
+(defun tx-create-object (system object)
   (let ((id (tx-persisted-id system)))
     (setf (object-id object) id)
-    (setf (gethash (object-id room) (cl-prevalence:get-root-object system :objects)) object)
+    (setf (gethash (object-id object) (cl-prevalence:get-root-object system :objects)) object)
     object))
 
 (defun tx-create-room (system room &optional starting?)
@@ -97,6 +98,9 @@
 (defun create-room! (room)
   (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room room))
   room)
+
+(defun create-object! (object)
+  (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-object object)))
 
 (defun object-set-name! (id name)
   (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-obj-set-name id name)))
@@ -152,6 +156,7 @@ If FORCE-NEW is true, any existing persisted data is cleared first."
       (room-add-object tavern guestbook)
       (room-add-exit tavern "north" forest)
       (room-add-exit forest "south" tavern)
+      (create-object! guestbook)
       (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room tavern t))
       (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room forest))
       (when *debug-mode* (mud.utils:log-message "Rooms created!")))))

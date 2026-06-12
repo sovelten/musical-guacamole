@@ -30,7 +30,7 @@
 (defun new-object (&key (name "object") (type +object-type-generic+) (location nil))
   "Create a new MUD object."
   (make-instance 'mud-object
-                 :id (mud.utils:make-id)
+                 :id -1                 ;; Set only when being persisted
                  :name name
                  :type type
                  :location location))

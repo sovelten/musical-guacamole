@@ -194,30 +194,26 @@
 
 (test prevalence-id-conflict-on-restart
   "Test that verifying id conflicts on restart replicates the bug."
-  (let ((original-id-counter mud.utils::*id-counter*)
-        (original-system mud:*system*))
+  (let ((original-system mud:*system*))
     (unwind-protect
          (progn
            ;; 1. Start with a clean state and reset id counter
-           (setf mud.utils::*id-counter* 0)
            (mud:world-restore-or-initialize :force-new t)
            
            ;; 2. Record initial room IDs (should be 1 and 2)
            (let ((initial-ids (mapcar #'mud:object-id (mud:rooms))))
-             (is (member 1 initial-ids))
              (is (member 2 initial-ids))
+             (is (member 3 initial-ids))
              
              ;; 3. Simulate a restart: close open streams, reset counter to 0
              (cl-prevalence:close-open-streams mud:*system*)
-             (setf mud.utils::*id-counter* 0)
-             
+
              ;; 4. Restore the world (without force-new, reading back from file)
              (mud:world-restore-or-initialize :force-new nil)
              
              (let ((restored-ids (mapcar #'mud:object-id (mud:rooms))))
                ;; Ensure the rooms were loaded with their original IDs
-               (is (member 1 restored-ids))
-               (is (member 2 restored-ids))
+               (is (equal initial-ids restored-ids))
                
                ;; 5. Create a new object post-restart
                (let* ((new-room (mud:create-room! (mud:new-room :name "Post-Restart Room")))
@@ -231,5 +227,35 @@
                      "New object ID ~D conflicts with existing loaded room IDs: ~A"
                      new-id restored-ids))))))
       ;; Restore original state
-      (setf mud.utils::*id-counter* original-id-counter)
       (setf mud:*system* original-system)))
+
+(test guestbook-persistence
+  "Test that guestbook entries are persistent across world reloads"
+  (let ((original-system mud:*system*))
+    (unwind-protect
+         (progn
+           ;; 1. Force a new world initialization
+           (mud:world-restore-or-initialize :force-new t)
+
+           ;; Find the tavern and the guestbook inside it
+           (let* ((tavern (mud:room-by-id 2))
+                  (guestbook (find-if (lambda (obj) (typep obj 'mud::mud-guestbook)) (mud:room-contents tavern))))
+             (is (not (null guestbook)))
+
+             ;; 2. Write a persistent entry using the transaction function
+             (mud::write-guestbook-entry! 2 (mud:object-id guestbook) "Sophia" "Persistent message!")
+
+             ;; 3. Close the prevalence system and reload from disk (simulating server restart)
+             (cl-prevalence:close-open-streams mud:*system*)
+             (mud:world-restore-or-initialize :force-new nil)
+
+             ;; 4. Check that the reloaded room contains the guestbook with the message
+             (let* ((reloaded-tavern (mud:room-by-id 2))
+                    (reloaded-guestbook (find-if (lambda (obj) (typep obj 'mud::mud-guestbook)) (mud:room-contents reloaded-tavern))))
+               (is (not (null reloaded-guestbook)))
+               (let ((entries (mud::guestbook-entries reloaded-guestbook)))
+                 (is (= (length entries) 1))
+                 (is (equal (getf (first entries) :author) "Sophia"))
+                 (is (equal (getf (first entries) :message) "Persistent message!"))))))
+      ;; Restore original state
+      (setf mud:*system* original-system))))
