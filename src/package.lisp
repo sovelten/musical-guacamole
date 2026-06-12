@@ -21,6 +21,12 @@
    #:object-set-property
    #:object-move
    #:object-describe
+   #:mud-guestbook
+   #:new-guestbook
+   #:guestbook-entries
+   #:guestbook-add-entry
+   #:guestbook-format-entries
+   #:write-guestbook-entry!
    
    ;; World system
    #:get-config-key
