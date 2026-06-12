@@ -6,6 +6,40 @@
 (defvar *system-location* #p"./prevalence/")
 (defvar *system* nil)
 
+(defclass mud-world ()
+    ((id-counter :initarg :id-counter
+                 :accessor world-id-counter
+                 :initform 0
+                 :documentation "id counter")
+     (config :initarg config
+             :accessor world-config
+             :initform (make-hash-table)
+             :documentation "Configuration hash map")
+     (rooms :initarg :rooms
+            :accessor world-rooms
+            :initform (make-hash-table)
+            :documentation "All rooms")
+     (objects :initarg :objects
+              :accessor world-objects
+              :initform (make-hash-table)
+              :documentation "All objects")
+     (players :initarg :players
+              :accessor world-players
+              :initform (make-hash-table)
+              :documentation "All players")))
+
+(defun new-world (rooms)
+  (make-instance 'mud-world :rooms rooms))
+
+(defun initial-world ()
+  (let ((tavern (new-room :name "The Tavern" :description "There is a guestbook on top of a table. Hint: type \"write\" to write an entry on the guestbook."))
+        (forest (new-room :name "A Dense Forest"))
+        (guestbook (new-guestbook :name "a guestbook")))
+    (room-add-object tavern guestbook)
+    (room-add-exit tavern "north" forest)
+    (room-add-exit forest "south" tavern)
+    (new-world )))
+
 ;; NOT PERSISTED
 
 (defun total-players ()

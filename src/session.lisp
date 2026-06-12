@@ -126,6 +126,7 @@
   (session-send-message obj message :newline newline))
 
 (defun ask-input (obj question &optional (default ""))
+  "Asks input from the user"
   (mud-write obj question :newline t)
   (multiple-value-bind (line status) (mud-read-line obj)
     (if (and line (null status))
