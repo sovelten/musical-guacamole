@@ -76,6 +76,16 @@
   (let ((obj (gethash id (cl-prevalence:get-root-object system :rooms))))
     (setf (object-name obj) name)))
 
+(defun tx-add-guestbook-entry (system room-id guestbook-id author message)
+  (let ((room (gethash room-id (cl-prevalence:get-root-object system :rooms))))
+    (when room
+      (let ((guestbook (find-if (lambda (obj)
+                                  (and (typep obj 'mud-guestbook)
+                                       (= (object-id obj) guestbook-id)))
+                                (room-contents room))))
+        (when guestbook
+          (guestbook-add-entry guestbook author message))))))
+
 ;; CL-PREVALENCE MUTATION
 
 (defun create-room! (room)
@@ -84,6 +94,9 @@
 
 (defun object-set-name! (id name)
   (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-obj-set-name id name)))
+
+(defun write-guestbook-entry! (room-id guestbook-id author message)
+  (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-add-guestbook-entry room-id guestbook-id author message)))
 
 ;; CL-PREVALENCE "QUERIES"
 
@@ -127,15 +140,15 @@ If FORCE-NEW is true, any existing persisted data is cleared first."
   (unless (cl-prevalence:get-root-object *system* :rooms)
     (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-system))
     (when *debug-mode* (mud.utils:log-message "Initializing world..."))
-    (let ((tavern (new-room :name "The Tavern"))
-          (forest (new-room :name "A Dense Forest")))
+    (let ((tavern (new-room :name "The Tavern" :description "There is a guestbook on top of a table. Hint: \"write <message>\" will register an entry on the guestbook."))
+          (forest (new-room :name "A Dense Forest"))
+          (guestbook (new-guestbook :name "a guestbook")))
+      (room-add-object tavern guestbook)
       (room-add-exit tavern "north" forest)
       (room-add-exit forest "south" tavern)
       (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room tavern t))
       (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room forest))
-      (when *debug-mode* (mud.utils:log-message "Rooms created!"))))
-  ;; Initialize / restore ID counter to the maximum of currently allocated IDs
-  (setf mud.utils::*id-counter* (max mud.utils::*id-counter* (find-max-id))))
+      (when *debug-mode* (mud.utils:log-message "Rooms created!")))))
 
 (defun world-new-character (character)
   "Add a character to the world."

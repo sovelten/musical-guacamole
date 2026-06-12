@@ -51,3 +51,15 @@
 (defun session-send-prompt (session)
   "Send a prompt to a player on the same line (no newline)."
   (session-send-message session "> " :newline nil))
+
+(defun ask-input (session question &optional (default ""))
+  (session-send-message session question)
+  (session-send-prompt session)
+  (let ((socket (session-socket session)))
+    (multiple-value-bind (line status) (read-line-with-timeout socket 300)
+      (if (and line (null status))
+          (let ((trimmed (string-trim '(#\Return #\Newline) line)))
+            (if (and trimmed (> (length trimmed) 0))
+                trimmed
+                default))
+          default))))

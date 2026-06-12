@@ -80,6 +80,48 @@
                                   (format nil "~A says: ~A" 
                                           (object-name player) message))))))))
 
+(define-command "read" (player args)
+  (let* ((room (object-location player))
+         (guestbook (or (find-if (lambda (obj) (typep obj 'mud-guestbook)) (room-contents room))
+                        (find-if (lambda (obj) (typep obj 'mud-guestbook)) (player-inventory player)))))
+    (cond
+      ((and (not (zerop (length args)))
+            (not (string-equal args "guestbook"))
+            (not (search "guestbook" (string-downcase args))))
+       (player-send-message player "Read what? Try: read guestbook"))
+      ((null guestbook)
+       (player-send-message player "There is nothing here to read."))
+      (t
+       (player-send-message player (guestbook-format-entries guestbook))))))
+
+(define-command "write" (player args)
+  (if (zerop (length args))
+      (player-send-message player "Write what? Usage: write <message> or write guestbook <message>")
+      (let* ((room (object-location player))
+             (guestbook (or (find-if (lambda (obj) (typep obj 'mud-guestbook)) (room-contents room))
+                            (find-if (lambda (obj) (typep obj 'mud-guestbook)) (player-inventory player)))))
+        (if (null guestbook)
+            (player-send-message player "There is no guestbook here to write in.")
+            (let* ((message args)
+                   (clean-message (if (and (> (length message) 9)
+                                           (string-equal (subseq message 0 10) "guestbook "))
+                                      (string-trim '(#\Space #\Tab) (subseq message 10))
+                                      message)))
+              (if (zerop (length clean-message))
+                  (player-send-message player "Write what? Usage: write <message> or write guestbook <message>")
+                  (progn
+                    (write-guestbook-entry! (object-id room)
+                                            (object-id guestbook)
+                                            (object-name player)
+                                            clean-message)
+                    (player-send-message player "You write your message in the guestbook.")
+                    (loop for obj across (room-contents room) do
+                      (when (and (typep obj 'mud-character)
+                                 (not (eq obj player)))
+                        (player-send-message obj (format nil "~A writes a message in ~A."
+                                                             (object-name player)
+                                                             (object-name guestbook))))))))))))
+
 (define-command "help" (player args)
   (declare (ignore args))
   (let ((help-text "Available commands:~%~{  ~A~%~}~%Type 'help <command>' for more info."))

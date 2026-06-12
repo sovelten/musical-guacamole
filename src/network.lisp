@@ -70,25 +70,10 @@
          (t
           (return (values nil status)))))))
 
-(defun ask-name (session default)
-  (session-send-message session "What is your name?")
-  (let ((socket (session-socket session)))
-    (if (null socket)
-        default
-        (progn
-          (session-send-prompt session)
-          (multiple-value-bind (line status) (read-line-with-timeout socket 300)
-            (if (and line (null status))
-                (let ((trimmed (string-trim '(#\Return #\Newline) line)))
-                  (if (and trimmed (> (length trimmed) 0))
-                      trimmed
-                      default))
-                default))))))
-
 (defun handle-client (session)
   "Main loop for handling a client connection."
   (let* ((guest-name (format nil "Guest~D" (random 10000)))
-         (char-name (ask-name session guest-name))
+         (char-name (ask-input session "What is your name?" guest-name))
          (character (new-character char-name session)))
     (mud.utils:log-message "New connection: ~A" char-name)
     (world-new-character character)

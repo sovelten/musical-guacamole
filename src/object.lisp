@@ -9,6 +9,10 @@
          :accessor object-name
          :initform "unnamed object"
          :documentation "Display name of the object")
+   (description :initarg :description
+                :accessor object-description
+                :initform ""
+                :documentation "Object description")
    (type :initarg :type
          :accessor object-type
          :initform +object-type-generic+
