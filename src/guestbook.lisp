@@ -19,15 +19,18 @@
                     :timestamp (parse-integer (third row))))
             (cl-csv:read-csv (pathname filepath)))))
 
-(defun new-guestbook (&key (name "a dusty guestbook") (filepath #p"./guestbook.csv"))
-  (let ((gb (make-instance 'mud-guestbook
-                           :id (mud.utils:make-id)
-                           :name name
-                           :filepath filepath
-                           :type +object-type-item+)))
-    (when filepath
+(defun new-guestbook (&key (name "a dusty guestbook") (filepath "./guestbook.csv"))
+  (let* ((filepath-str (if (pathnamep filepath)
+                           (namestring filepath)
+                           filepath))
+         (gb (make-instance 'mud-guestbook
+                            :id (mud.utils:make-id)
+                            :name name
+                            :filepath filepath-str
+                            :type +object-type-item+)))
+    (when filepath-str
       (setf (guestbook-entries gb)
-            (guestbook-load-from-csv filepath)))
+            (guestbook-load-from-csv filepath-str)))
     gb))
 
 (defun guestbook-append-entry-to-csv (entry filepath)
