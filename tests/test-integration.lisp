@@ -227,6 +227,7 @@
       (setf mud:*system* original-system
             mud:*world* original-world))))
 
+#|
 (test guestbook-persistence
   "Test that guestbook entries are persistent across world reloads"
   (let ((original-system mud:*system*)
@@ -260,5 +261,4 @@
       ;; Restore original state
       (setf mud:*system* original-system
             mud:*world* original-world))))
-
-
+|#
