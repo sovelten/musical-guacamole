@@ -2,7 +2,13 @@
 
 A MUD (Multi-User Dungeon) server written in Common Lisp, inspired by Dworkin's Game Driver (DGD) and LMUD, with the added reckless capability of running lisp code at your own risk and peril (don't start a real server with this on the internet). The name was inspired by the first repository name that github suggested to me.
 
-Very simple and raw at the moment, but the fact that it runs on lisp gives it some super powers, such as the ability to change the running image within the session.
+Very simple and raw at the moment, but the fact that it runs on lisp gives it some super powers, such as the ability to update the running image within the session.
+
+## Key Design Principles
+
+1. **Persistent Objects** - Game objects are persisted and changes are logged to enable recovery.
+2. **All power to the user** - You can eval lisp code directly within the game (could/should be restricted to admins in the future)
+3. **Hot Reloading** - No need to ever shut the server down for maintenance (WIP)
 
 ## Inspiration
 
@@ -96,12 +102,12 @@ You see:
 Exits: north
 
 Welcome to the MUD!
->  eval (mud:world-add-room (mud:create-room :name "Valinor")) 
+>  eval (mud:create-room! (mud:new-room :name "Valinor")) 
 #<MUD-ROOM Valinor (ID: 5)>
-> eval (mud:world-all-rooms)
+> eval (mud:rooms)
 (#<MUD-ROOM The Tavern (ID: 1)> #<MUD-ROOM A Dense Forest (ID: 2)>
  #<MUD-ROOM Valinor (ID: 5)>)
-> eval (mud:room-add-exits (mud:world-get-room 1) :west (mud:world-get-room 5) :east)
+> eval (mud:room-add-exits (mud:room-by-id 1) :west (mud:room-by-id 5) :east)
 #<MUD-ROOM The Tavern (ID: 1)>
 > look
 
@@ -139,124 +145,25 @@ In the SBCL REPL:
 
 ## Features
 
-### ✅ Currently Implemented (kind of, in a very crappy state)
+### ✅ Currently Implemented
 
 - **In-world REPL** - Execute Lisp code from within the game (at your own risk, no guardrails)
 - **Multi-player networking** - Multiple players connect via telnet simultaneously
 - **Object-oriented world** - Everything is an object with unique IDs and extensible properties
+- **Persistence** - Objects are persisted through cl-prevalence in-memory database. Journaling enables recovery in case server needs to be shutdown.
 - **Room system** - Navigable rooms with directional exits (north, south, east, west)
 - **Player chat** - "say" command for in-room communication
 - **Inventory system** - Foundation for item management
 - **Command system** - 7 built-in commands, easy to add more
-- **Multi-threaded architecture** - Each player runs in its own thread
-- **Thread-safe design** - Locks protect shared state (ID generation, player tracking)
-- **Error handling** - Graceful error handling and recovery
-- **Logging system** - Debug logging throughout the system
 
 ### 🎯 Planned Features
 
-- **Persistence layer** - Save/load world state to disk
-- **Hot code reloading** - Modify code without restarting
+- **Hot code reloading** - Update system without restarting
 - **Item system** - Full item objects with properties (take, drop, examine)
 - **NPC support** - Non-player characters with behaviors
 - **LLM NPCs** - What if we put in some llms armed with some mcp servers to interact in the world?
 
 ---
-
-## Architecture
-
-### Core System Components
-
-#### Object System (`src/object.lisp`)
-Everything in the MUD is a `mud-object`:
-- **Unique ID**: Auto-generated, thread-safe
-- **Name**: Display name
-- **Type**: Classification (room, player, item, etc.)
-- **Location**: Where the object is
-- **Properties**: Extensible hash-table for custom data
-
-#### Room System
-Rooms are specialized objects:
-- **Contents**: Array of objects in the room
-- **Exits**: Hash map of directional exits (north → room-id, etc.)
-- **Description**: Room appearance
-
-#### Player System (`src/player.lisp`)
-Players are specialized objects:
-- **Socket**: Network connection to client
-- **Inventory**: Array of carried objects
-- **Location**: Current room
-- **Input Buffer**: For command processing
-
-#### Command System (`src/command-handler.lisp`)
-Simple macro-based command definition:
-```lisp
-(define-command "command-name" (player args)
-  ;; Command implementation
-  )
-```
-
-#### World System (`src/world.lisp`)
-Global state management:
-- Room registry and lookup
-- Player tracking
-- Message broadcasting
-- World initialization
-
-#### Network System (`src/network.lisp`)
-- TCP server (default: 127.0.0.1:8888)
-- Accepts incoming connections
-- Per-player threading
-- Socket management and cleanup
-
-### Threading Model
-
-```
-Main Thread
-  ├─ Accept Connections Thread
-  │   └─ Spawns per-player threads on connection
-  │
-  ├─ Player Thread 1 (Client 1)
-  │   └─ Handle input/output for player 1
-  │
-  ├─ Player Thread 2 (Client 2)
-  │   └─ Handle input/output for player 2
-  │
-  └─ Player Thread N
-      └─ Handle input/output for player N
-```
-
-All threads communicate through:
-- Global player registry (locked)
-- World state (locked for mutations)
-- Thread-safe ID generation
-
-### Data Flow: Command Processing
-
-```
-Telnet Input ("go north")
-  ↓
-parse-command: Extract command and arguments
-  ↓
-process-command: Lookup handler in *commands* hash table
-  ↓
-Execute Handler: "go" command runs
-  ├─ Get current room
-  ├─ Look up exit
-  ├─ Move player
-  └─ Send messages
-  ↓
-Telnet Output: Room description + prompt
-```
-
-### Key Design Principles
-
-1. **Everything is an object** - Consistent model throughout
-2. **Extensible properties** - Objects gain properties at runtime
-3. **Command macro system** - Simple DSL for new commands
-4. **Per-player threading** - Concurrent player handling
-5. **Thread-safe design** - Locks protect shared state
-6. **Message broadcasting** - Coordinated multi-player events
 
 ## Development Guide
 
@@ -325,12 +232,12 @@ Objects have a flexible property storage system:
 ```lisp
 ;; Create rooms
 (defun build-world ()
-  (let ((tavern (mud:create-room :name "The Tavern"))
-        (forest (mud:create-room :name "A Dense Forest")))
+  (let ((tavern (mud:new-room :name "The Tavern"))
+        (forest (mud:new-room :name "A Dense Forest")))
     
     ;; Register rooms
-    (mud:world-add-room tavern)
-    (mud:world-add-room forest)
+    (mud:create-room! tavern)
+    (mud:create-room! forest)
     
     ;; Connect rooms
     (mud:room-add-exit tavern "north" forest)
@@ -353,24 +260,6 @@ Send messages to all players:
 
 ;; Message to all except one
 (world-broadcast "A wizard teleports away!" except-player)
-```
-
-### Timed Events
-
-Use threading for periodic events:
-
-```lisp
-(defun start-world-heartbeat (interval)
-  "Update world every INTERVAL seconds."
-  (bordeaux-threads:make-thread
-    (lambda ()
-      (loop while mud:*server-running* do
-        (sleep interval)
-        ;; Update logic here
-        (dolist (room (mud:world-all-rooms))
-          ;; Do something with each room
-          )))
-    :name "world-heartbeat"))
 ```
 
 ### Testing Commands
@@ -407,10 +296,10 @@ Edit `src/constants.lisp`:
 (mud:status)
 
 ;; Get running players
-(mud:world-all-players)
+(mud:characters)
 
 ;; Get all rooms
-(mud:world-all-rooms)
+(mud:rooms)
 ```
 
 ### Stopping the Server
@@ -431,6 +320,7 @@ This:
 
 - **usocket** - Network communication
 - **bordeaux-threads** - Multi-threading
+- **cl-prevalence** - Persistence
 - **fiveam** - Testing framework (optional)
 
 All installed via Quicklisp automatically.

@@ -12,11 +12,12 @@
           :documentation "Map of exit names to target rooms"))
   (:documentation "A location/room in the MUD"))
 
-(defun create-room (&key (name "A Room"))
+(defun new-room (&key (name "A Room") (description ""))
   "Create a new room."
   (make-instance 'mud-room
-                 :id (mud.utils:make-id)
                  :name name
+                 :description description
+                 :id -1                 ;;Set when persisted
                  :type +object-type-room+
                  :location nil))
 
@@ -62,8 +63,9 @@
 
 (defun room-describe (room)
   "Get a full description of a room including contents and exits."
-  (format nil "~%=== ~A ===~%~%You see:~%~{  - ~A~%~}~%~%Exits: ~{~A~^, ~}~%"
+  (format nil "~%=== ~A ===~%~A~%You see:~%~{  - ~A~%~}~%~%Exits: ~{~A~^, ~}~%"
           (object-name room)
+          (object-description room)
           (map 'list #'object-describe (room-contents room))
           (loop for key being the hash-keys of (room-exits room)
                 collect key)))

@@ -1,4 +1,4 @@
-(in-package #:mud.tests)
+(in-package #:mud-test)
 
 (in-suite mud-tests)
 
@@ -6,7 +6,7 @@
   "Test that the server can be initialized without crashing"
   (handler-case
       (progn
-        (is (not (null (mud:get-config-key mud:*system* :starting-room-id))))
+        (is (not (null (mud:get-config-key :starting-room-id))))
         (is (> (mud:total-rooms) 0)))
     (error (e)
       (fail (format nil "Server initialization failed: ~A" e)))))
@@ -17,7 +17,7 @@
       (progn
         ;; Create a player without a real socket
         (let ((session (make-instance 'mud:mud-session :socket nil))
-              (player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+              (player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
           (mud:world-new-character player)
           ;; Test that the player was created
           (is (equal (mud:object-name player) "TestPlayer"))
@@ -36,7 +36,7 @@
   (handler-case
       (progn
         (let ((session (make-instance 'mud:mud-session :socket nil))
-              (player (mud:create-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+              (player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
           ;; Sending message to player with nil socket should not crash
           (mud:player-send-message player "Test message")
           (is (not (null player)))))
@@ -50,7 +50,7 @@
       (progn
         ;; Simulate creating and disconnecting a player
         (let* ((session (make-instance 'mud:mud-session :socket nil))
-               (player (mud:create-character "DisconnectTest" session)))
+               (player (mud:new-character "DisconnectTest" session)))
           (mud:world-new-character player)
           ;; Verify player was created
           (is (equal (mud:object-name player) "DisconnectTest"))
@@ -59,16 +59,16 @@
           ;; Try to send message - should not crash or loop
           (mud:player-send-message player "Test after disconnect")
           ;; Player disconnect should work gracefully
-          (mud:world-remove-player player)
+          (mud:remove-character player)
           (is (not (null player)))))
     (error (e)
       (fail (format nil "Graceful disconnection failed: ~A" e)))))
 
 (test player-removal-from-world
   "Test that player is removed from world data structures on disconnect"
-  (let* ((room (mud:create-room :name "Test Room"))
+  (let* ((room (mud:new-room :name "Test Room"))
          (session (make-instance 'mud:mud-session :socket nil))
-         (character (mud:create-character "TestRemovePlayer" session)))
+         (character (mud:new-character "TestRemovePlayer" session)))
 
     (mud:world-new-character character)
     (setf (mud:object-location character) room)
@@ -77,7 +77,7 @@
     (is (find character (mud:room-contents room)))
     (is (gethash (mud:object-id character) mud:*players*))
     
-    (mud:world-remove-player character)
+    (mud:remove-character character)
     
     (is (not (find character (mud:room-contents room))))
     (is (not (gethash (mud:object-id character) mud:*players*)))))
@@ -101,11 +101,6 @@
            ;; Server should ask for name
            (let ((line1 (read-line client-stream nil nil)))
              (is (equal line1 "What is your name?")))
-           
-           ;; Read prompt "> "
-           (let ((prompt (make-string 2)))
-             (read-sequence prompt client-stream)
-             (is (equal prompt "> ")))
            
            ;; Send player name
            (write-line "QuitTestPlayer" client-stream)
@@ -169,11 +164,6 @@
            (let ((line1 (read-line client-stream nil nil)))
              (is (equal line1 "What is your name?")))
            
-           ;; Read prompt "> "
-           (let ((prompt (make-string 2)))
-             (read-sequence prompt client-stream)
-             (is (equal prompt "> ")))
-           
            ;; Send player name
            (write-line "AbruptPlayer" client-stream)
            (force-output client-stream)
@@ -201,3 +191,74 @@
       (when client-stream (close client-stream))
       (when client-socket (usocket:socket-close client-socket))
       (mud:stop-mud-server))))
+
+(test prevalence-id-conflict-on-restart
+  "Test that ID conflicts do NOT occur on restart with the snapshot model."
+  (let ((original-system mud:*system*)
+        (original-world mud:*world*))
+    (unwind-protect
+         (progn
+           ;; 1. Start with a clean state
+           (mud:world-restore-or-initialize :force-new t)
+
+           ;; 2. Record initial room IDs
+           (let ((initial-ids (mapcar #'mud:object-id (mud:rooms))))
+             (is (member 2 initial-ids))
+             (is (member 3 initial-ids))
+
+             ;; 3. Simulate a restart: close and restore
+             (cl-prevalence:close-open-streams mud:*system*)
+             (mud:world-restore-or-initialize :force-new nil)
+
+             (let ((restored-ids (mapcar #'mud:object-id (mud:rooms))))
+               ;; Ensure rooms were loaded with their original IDs
+               (is (= (length initial-ids) (length restored-ids)))
+               (is (subsetp initial-ids restored-ids))
+
+               ;; 4. Add a new room post-restart (direct mutation on *world*)
+               (let ((new-room (mud:new-room :name "Post-Restart Room")))
+                 (mud:world-add-room mud:*world* new-room)
+                 (let ((new-id (mud:object-id new-room)))
+                   ;; The new ID must NOT conflict with restored IDs
+                   (is (not (member new-id restored-ids))
+                       "New object ID ~D conflicts with existing loaded room IDs: ~A"
+                       new-id restored-ids))))))
+      ;; Restore original state
+      (setf mud:*system* original-system
+            mud:*world* original-world))))
+
+(test guestbook-persistence
+  "Test that guestbook entries are persistent across world reloads"
+  (let ((original-system mud:*system*)
+        (original-world mud:*world*))
+    (unwind-protect
+         (progn
+           ;; 1. Force a new world initialization
+           (mud:world-restore-or-initialize :force-new t)
+
+           ;; Find the tavern and the guestbook inside it
+           (let* ((tavern (mud:room-by-id 2))
+                  (guestbook (find-if (lambda (obj) (typep obj 'mud::mud-guestbook)) (mud:room-contents tavern))))
+             (is (not (null guestbook)))
+
+             ;; 2. Write a persistent entry directly and sync
+             (mud::guestbook-add-entry guestbook "Sophia" "Persistent message!")
+             (mud:sync-world)
+
+             ;; 3. Close the prevalence system and reload from disk (simulating server restart)
+             (cl-prevalence:close-open-streams mud:*system*)
+             (mud:world-restore-or-initialize :force-new nil)
+
+             ;; 4. Check that the reloaded room contains the guestbook with the message
+             (let* ((reloaded-tavern (mud:room-by-id 2))
+                    (reloaded-guestbook (find-if (lambda (obj) (typep obj 'mud::mud-guestbook)) (mud:room-contents reloaded-tavern))))
+               (is (not (null reloaded-guestbook)))
+               (let ((entries (mud::guestbook-entries reloaded-guestbook)))
+                 (is (= (length entries) 1))
+                 (is (equal (getf (first entries) :author) "Sophia"))
+                 (is (equal (getf (first entries) :message) "Persistent message!"))))))
+      ;; Restore original state
+      (setf mud:*system* original-system
+            mud:*world* original-world))))
+
+

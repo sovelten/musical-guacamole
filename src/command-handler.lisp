@@ -80,6 +80,41 @@
                                   (format nil "~A says: ~A" 
                                           (object-name player) message))))))))
 
+(define-command "read" (player args)
+  (let* ((room (object-location player))
+         (guestbook (or (find-if (lambda (obj) (typep obj 'mud-guestbook)) (room-contents room))
+                        (find-if (lambda (obj) (typep obj 'mud-guestbook)) (player-inventory player)))))
+    (cond
+      ((and (not (zerop (length args)))
+            (not (string-equal args "guestbook"))
+            (not (search "guestbook" (string-downcase args))))
+       (player-send-message player "Read what? Try: read guestbook"))
+      ((null guestbook)
+       (player-send-message player "There is nothing here to read."))
+      (t
+       (player-send-message player (guestbook-format-entries guestbook))))))
+
+(define-command "write" (player args)
+  (let* ((room (object-location player))
+         (guestbook (or (find-if (lambda (obj) (typep obj 'mud-guestbook)) (room-contents room))
+                        (find-if (lambda (obj) (typep obj 'mud-guestbook)) (player-inventory player)))))
+    (if (null guestbook)
+        (player-send-message player "There is no guestbook here to write in.")
+        (let* ((session (character-session player))
+               (message (ask-input session "What message do you want to write?")))
+          (if (zerop (length message))
+              (player-send-message player "Write what? Please try again.")
+              (progn
+                (guestbook-add-entry guestbook (object-name player) message)
+                (sync-world)
+                (player-send-message player "You write your message in the guestbook.")
+                (loop for obj across (room-contents room) do
+                  (when (and (typep obj 'mud-character)
+                             (not (eq obj player)))
+                    (player-send-message obj (format nil "~A writes a message in ~A."
+                                                     (object-name player)
+                                                     (object-name guestbook)))))))))))
+
 (define-command "help" (player args)
   (declare (ignore args))
   (let ((help-text "Available commands:~%~{  ~A~%~}~%Type 'help <command>' for more info."))
@@ -92,7 +127,7 @@
 (define-command "quit" (player args)
   (declare (ignore args))
   (player-send-message player "Goodbye!")
-  (world-remove-player player)
+  (remove-character player)
   (session-disconnect (character-session player)))
 
 (defun parse-command (input)

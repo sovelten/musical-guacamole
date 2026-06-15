@@ -9,6 +9,10 @@
          :accessor object-name
          :initform "unnamed object"
          :documentation "Display name of the object")
+   (description :initarg :description
+                :accessor object-description
+                :initform ""
+                :documentation "Object description")
    (type :initarg :type
          :accessor object-type
          :initform +object-type-generic+
@@ -23,10 +27,10 @@
                :documentation "Extensible property storage"))
   (:documentation "Base class for all MUD objects"))
 
-(defun create-object (&key (name "object") (type +object-type-generic+) (location nil))
+(defun new-object (&key (name "object") (type +object-type-generic+) (location nil))
   "Create a new MUD object."
   (make-instance 'mud-object
-                 :id (mud.utils:make-id)
+                 :id -1                 ;; Set only when being persisted
                  :name name
                  :type type
                  :location location))

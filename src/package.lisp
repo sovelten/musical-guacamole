@@ -12,7 +12,7 @@
    
    ;; Object system
    #:mud-object
-   #:create-object
+   #:new-object
    #:object-id
    #:object-name
    #:object-location
@@ -21,11 +21,16 @@
    #:object-set-property
    #:object-move
    #:object-describe
+   #:mud-guestbook
+   #:new-guestbook
+   #:guestbook-entries
+   #:guestbook-add-entry
+   #:guestbook-format-entries
    
    ;; World system
    #:get-config-key
    #:mud-room
-   #:create-room
+   #:new-room
    #:room-contents
    #:room-add-object
    #:room-remove-object
@@ -36,17 +41,20 @@
    #:world-restore-or-initialize
    #:world-new-character
    #:world-add-room
-   #:world-get-player
-   #:world-get-room
-   #:world-all-rooms
+   #:character-by-id
+   #:room-by-id
+   #:rooms
    #:total-rooms
+   #:starting-room
+   #:sync-world
+   #:*world*
    #:*players*
    #:*system*
    
    ;; Player system
    #:mud-character
    #:mud-session
-   #:create-character
+   #:new-character
    #:session-socket
    #:session-input-buffer
    #:character-session
@@ -55,8 +63,7 @@
    #:character-inventory-add
    #:character-inventory-remove
    #:player-send-message
-   #:player-send-prompt
-   #:world-remove-player
+   #:remove-character
    
    ;; Command system
    #:process-command
