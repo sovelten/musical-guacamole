@@ -26,14 +26,11 @@
    #:guestbook-entries
    #:guestbook-add-entry
    #:guestbook-format-entries
-   #:write-guestbook-entry!
    
    ;; World system
    #:get-config-key
    #:mud-room
    #:new-room
-   #:create-room!
-   #:object-set-name!
    #:room-contents
    #:room-add-object
    #:room-remove-object
@@ -48,6 +45,9 @@
    #:room-by-id
    #:rooms
    #:total-rooms
+   #:starting-room
+   #:sync-world
+   #:*world*
    #:*players*
    #:*system*
    

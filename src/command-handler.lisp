@@ -105,10 +105,8 @@
           (if (zerop (length message))
               (player-send-message player "Write what? Please try again.")
               (progn
-                (write-guestbook-entry! (object-id room)
-                                        (object-id guestbook)
-                                        (object-name player)
-                                        message)
+                (guestbook-add-entry guestbook (object-name player) message)
+                (sync-world)
                 (player-send-message player "You write your message in the guestbook.")
                 (loop for obj across (room-contents room) do
                   (when (and (typep obj 'mud-character)
