@@ -63,6 +63,11 @@
     (world-set-starting-room world tavern)
     world))
 
+;; BKNR
+
+(make-instance 'bknr.datastore:mp-store :directory #p"./bknr/"
+               :subsystems (list (make-instance 'bknr.datastore:store-object-subsystem)))
+
 ;; NOT PERSISTED
 
 (defun total-players ()
