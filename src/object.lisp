@@ -1,6 +1,6 @@
 (in-package #:mud)
-;; Base mud-object class
-(defclass mud-object (bknr.datastore:store-object)
+
+(defclass mud-object ()
   ((id :initarg :id
        :accessor object-id
        :documentation "Unique identifier for this object")
@@ -29,7 +29,7 @@
                :initform (make-hash-table :test #'equal)
                :documentation "Extensible property storage"))
   (:documentation "Base class for all MUD objects")
-  (:metaclass bknr.datastore:persistent-class))
+  (:metaclass bknr.indices:indexed-class))
 
 (defun new-object (&key (name "object") (type +object-type-generic+) (location nil))
   "Create a new MUD object."
