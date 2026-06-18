@@ -1,6 +1,7 @@
 (in-package #:mud)
 
 ;; Room class - a specialized mud-object
+
 (defclass mud-room (mud-object)
   ((contents :initarg :contents
              :accessor room-contents
@@ -10,6 +11,7 @@
           :accessor room-exits
           :initform (make-hash-table :test #'equal)
           :documentation "Map of exit names to target rooms"))
+  (:metaclass bknr.indices:indexed-class)
   (:documentation "A location/room in the MUD"))
 
 (defun new-room (&key (name "A Room") (description ""))
@@ -17,7 +19,14 @@
   (make-instance 'mud-room
                  :name name
                  :description description
-                 :id -1                 ;;Set when persisted
+                 :type +object-type-room+
+                 :location nil))
+
+(defun new-persistent-room (&key (name "A Room") (description ""))
+  "Create a new persistent room that will be stored in the BKNR datastore."
+  (make-instance 'persistent-room
+                 :name name
+                 :description description
                  :type +object-type-room+
                  :location nil))
 

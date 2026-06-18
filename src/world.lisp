@@ -3,10 +3,41 @@
 (defvar *players* (make-hash-table :test #'equal)
   "Hash table storing all active players, keyed by player object ID")
 
-(defvar *system-location* #p"./prevalence/")
-(defvar *system* nil)
+(defvar *world* nil
+  "The single MUD world instance holding all persistent state")
 
-;; NOT PERSISTED
+(defclass mud-world ()
+  ((id-counter :initarg :id-counter
+               :accessor world-id-counter
+               :initform 0
+               :documentation "Monotonic ID counter for assigning world-level IDs.")
+   (config :initarg :config
+           :accessor world-config
+           :initform (make-hash-table :test #'eq)
+           :documentation "Configuration hash table (keys are keywords)."))
+  (:documentation "Configuration root for the MUD world.  Rooms, guestbooks,
+   and other objects are stored as independent BKNR persistent objects."))
+
+(defun new-world () (make-instance 'mud-world))
+
+(defun world-gen-id (world)
+  ;; Increment id counter and return new id
+  (incf (world-id-counter world)))
+
+(defun world-add-room (world room)
+  "Assign a world-level ID to a room and return it."
+  (setf (object-id room) (world-gen-id world))
+  room)
+
+(defun world-add-object (world object)
+  "Assign a world-level ID to an object and return it."
+  (setf (object-id object) (world-gen-id world))
+  object)
+
+(defun world-set-starting-room (world room)
+  (setf (gethash :starting-room-id (world-config world)) (object-id room)))
+
+;; ─── Transient player management ────────────────────────────────────────────
 
 (defun total-players ()
   (hash-table-count *players*))
@@ -50,120 +81,10 @@
     (unless (and exclude-player (eq (object-id player) (object-id exclude-player)))
       (player-send-message player message))))
 
-;; CL-PREVALENCE TRANSACTIONS
+;; ─── BKNR Persistence ───────────────────────────────────────────────────────
 
-(defun tx-persisted-id (system)
-  (let* ((counter (cl-prevalence:get-root-object system :id-counter))
-         (id (incf counter)))
-    (setf (cl-prevalence:get-root-object system :id-counter) id)
-    id))
+;; ─── World queries ──────────────────────────────────────────────────────────
 
-(defun tx-create-system (system)
-  (setf (cl-prevalence:get-root-object system :rooms) (make-hash-table))
-  (setf (cl-prevalence:get-root-object system :objects) (make-hash-table))
-  (setf (cl-prevalence:get-root-object system :config) (make-hash-table))
-  (setf (cl-prevalence:get-root-object system :id-counter) 0))
-
-(defun tx-create-object (system object)
-  (let ((id (tx-persisted-id system)))
-    (setf (object-id object) id)
-    (setf (gethash (object-id object) (cl-prevalence:get-root-object system :objects)) object)
-    object))
-
-(defun tx-create-room (system room &optional starting?)
-  (let ((id (tx-persisted-id system)))
-    (setf (object-id room) id)
-    (setf (gethash (object-id room) (cl-prevalence:get-root-object system :rooms)) room)
-    (when starting?
-      (when *debug-mode* (mud.utils:log-message "Starting room is ~A" (object-name room)))
-      (setf (gethash :starting-room-id (cl-prevalence:get-root-object system :config)) (object-id room)))
-    room))
-
-(defun tx-obj-set-name (system id name)
-  (let ((obj (gethash id (cl-prevalence:get-root-object system :rooms))))
-    (setf (object-name obj) name)))
-
-(defun tx-add-guestbook-entry (system room-id guestbook-id author message)
-  (let ((room (gethash room-id (cl-prevalence:get-root-object system :rooms))))
-    (when room
-      (let ((guestbook (find-if (lambda (obj)
-                                  (and (typep obj 'mud-guestbook)
-                                       (= (object-id obj) guestbook-id)))
-                                (room-contents room))))
-        (when guestbook
-          (guestbook-add-entry guestbook author message))))))
-
-;; CL-PREVALENCE MUTATION
-
-(defun create-room! (room)
-  (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room room))
-  room)
-
-(defun create-object! (object)
-  (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-object object)))
-
-(defun object-set-name! (id name)
-  (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-obj-set-name id name)))
-
-(defun write-guestbook-entry! (room-id guestbook-id author message)
-  (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-add-guestbook-entry room-id guestbook-id author message)))
-
-;; CL-PREVALENCE "QUERIES"
-
-(defun total-rooms ()
-  (hash-table-count (cl-prevalence:get-root-object *system* :rooms)))
-
-(defun room-by-id (room-id)
-  "Get a room from the world by ID."
-  (gethash room-id (cl-prevalence:get-root-object *system* :rooms)))
-
-(defun rooms ()
-  "Get all rooms in the world."
-  (let ((rooms (cl-prevalence:get-root-object *system* :rooms)))
-    (if rooms
-        (loop for room being the hash-values of rooms
-              collect room)
-        nil)))
-
-(defun get-config-key (system key)
-  (gethash key (cl-prevalence:get-root-object system :config)))
-
-(defun starting-room (system)
-  (room-by-id (get-config-key system :starting-room-id)))
-
-(defun find-max-id ()
-  "Find the maximum ID among all loaded rooms and their nested contents."
-  (let ((max-id 0))
-    (dolist (room (rooms))
-      (setf max-id (max max-id (object-id room)))
-      (loop for obj across (room-contents room)
-            do (setf max-id (max max-id (object-id obj)))))
-    max-id))
-
-(defun world-restore-or-initialize (&key force-new (location *system-location*))
-  "Restore the world from prevalence or initialize a new one.
-If FORCE-NEW is true, any existing persisted data is cleared first."
-  (when force-new
-    (mud.utils:log-message "Forcing new world generation, clearing existing prevalence data...")
-    (uiop:delete-directory-tree location :validate (constantly t) :if-does-not-exist :ignore))
-  (setf *system* (cl-prevalence:make-prevalence-system location))
-  (unless (cl-prevalence:get-root-object *system* :rooms)
-    (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-system))
-    (when *debug-mode* (mud.utils:log-message "Initializing world..."))
-    (let ((tavern (new-room :name "The Tavern" :description "There is a guestbook on top of a table. Hint: type \"write\" to write an entry on the guestbook."))
-          (forest (new-room :name "A Dense Forest"))
-          (guestbook (new-guestbook :name "a guestbook")))
-      (room-add-object tavern guestbook)
-      (room-add-exit tavern "north" forest)
-      (room-add-exit forest "south" tavern)
-      (create-object! guestbook)
-      (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room tavern t))
-      (cl-prevalence:execute *system* (cl-prevalence:make-transaction 'tx-create-room forest))
-      (when *debug-mode* (mud.utils:log-message "Rooms created!")))))
-
-(defun world-new-character (character)
-  "Add a character to the world."
-  (let ((room (starting-room *system*)))
-    (setf (object-location character) room)
-    (room-add-object room character)
-    (add-character character)))
+(defun get-config-key (key)
+  "Get a configuration value from the world config."
+  (gethash key (world-config *world*)))

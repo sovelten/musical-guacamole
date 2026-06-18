@@ -7,6 +7,9 @@
                "bordeaux-threads"
                "str"
                "cl-prevalence"
+               "bknr.datastore"
+               "bknr.indices"
+               "bknr.utils"
                "cl-csv")
   :components ((:module "src"
                 :components
@@ -18,6 +21,8 @@
                  (:file "room" :depends-on ("object"))
                  (:file "guestbook" :depends-on ("object"))
                  (:file "character" :depends-on ("object" "session"))
-                 (:file "world" :depends-on ("character" "room" "guestbook"))
-                 (:file "command-handler" :depends-on ("world"))
+                 (:file "store" :depends-on ("package"))
+                 (:file "world" :depends-on ("room" "guestbook" "character"))
+                 (:file "persistent-world" :depends-on ("store" "world" "room" "guestbook"))
+                 (:file "command-handler" :depends-on ("persistent-world"))
                  (:file "network" :depends-on ("command-handler"))))))
