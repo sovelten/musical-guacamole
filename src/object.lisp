@@ -6,8 +6,6 @@
        :accessor object-id
        :documentation "Unique identifier for this object")
    (name :initarg :name
-         :index-type bknr.indices:hash-index
-         :index-initargs (:test #'equal)
          :accessor object-name
          :initform "unnamed object"
          :documentation "Display name of the object")
@@ -27,20 +25,7 @@
                :accessor object-properties
                :initform (make-hash-table :test #'equal)
                :documentation "Extensible property storage"))
-  (:documentation "Base class for all MUD objects")
-  (:metaclass bknr.indices:indexed-class))
-
-(defun object-with-name (name)
-  "Return all MUD objects with the given NAME (dynamically resolved index)."
-  (let* ((class (find-class 'mud-object))
-         (index (bknr.indices:indexed-class-index-named class 'name)))
-    (bknr.indices:index-get index name)))
-
-(defun all-objects ()
-  "Return all MUD object instances (dynamically resolved index)."
-  (let* ((class (find-class 'mud-object))
-         (index (bknr.indices:indexed-class-index-named class 'name)))
-    (bknr.indices:index-values index)))
+  (:documentation "Base class for all MUD objects"))
 
 (defun new-object (&key (name "object") (type +object-type-generic+) (location nil))
   "Create a new MUD object."

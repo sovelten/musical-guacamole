@@ -28,8 +28,6 @@
    #:guestbook-format-entries
    
    ;; World system
-   #:object-with-name
-   #:all-objects
    #:get-config-key
    #:mud-room
    #:new-room
@@ -40,9 +38,16 @@
    #:room-add-exit
    #:room-add-exits
    #:room-get-exit
+   #:new-world
    #:world-restore-or-initialize
    #:world-add-character!
    #:world-set-object-id!
+   #:world-object-by-id
+   #:world-object-with-name
+   #:world-all-objects
+   #:world-room-by-id
+   #:world-rooms
+   #:world-total-rooms
    #:character-by-id
    #:room-by-id
    #:rooms

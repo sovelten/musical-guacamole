@@ -11,7 +11,6 @@
           :accessor room-exits
           :initform (make-hash-table :test #'equal)
           :documentation "Map of exit names to target rooms"))
-  (:metaclass bknr.indices:indexed-class)
   (:documentation "A location/room in the MUD"))
 
 (defun new-room (&key (name "A Room") (description ""))

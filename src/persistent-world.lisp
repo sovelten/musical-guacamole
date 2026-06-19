@@ -123,10 +123,17 @@ When FORCE-NEW is true any existing store data is wiped first."
   (open-mud-store)
   (let ((stored-worlds (bknr.datastore:store-objects-with-class 'persistent-world)))
     (if stored-worlds
-        (progn
+        (let ((world (first stored-worlds)))
+          ;; Populate world's indices from BKNR objects
+          (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-object))
+            (world-set-object-id! world obj))
+          (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-room))
+            (world-set-object-id! world obj))
+          (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-guestbook))
+            (world-set-object-id! world obj))
           (when *debug-mode*
             (mud.utils:log-message "World restored from BKNR datastore."))
-          (first stored-worlds))
+          world)
         (let ((world (initial-world)))
           (sync-world)
           (when *debug-mode*
@@ -141,13 +148,16 @@ When FORCE-NEW is true any existing store data is wiped first."
       (first worlds))))
 
 (defun total-rooms ()
-  "Return the number of persistent rooms."
+  "Return the number of persistent rooms.
+Note: Prefer (world-total-rooms world) in new code."
   (length (bknr.datastore:store-objects-with-class 'persistent-room)))
 
 (defun room-by-id (room-id)
-  "Look up a room by its world-level ID."
+  "Look up a persistent room by its world-level ID.
+Note: Prefer (world-room-by-id world room-id) in new code."
   (find room-id (rooms) :key #'object-id))
 
 (defun rooms ()
-  "Return all persistent rooms."
+  "Return all persistent rooms.
+Note: Prefer (world-rooms world) in new code."
   (bknr.datastore:store-objects-with-class 'persistent-room))

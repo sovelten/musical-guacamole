@@ -12,7 +12,15 @@
    (players :initarg :players
             :accessor world-players
             :initform (make-hash-table :test #'equal)
-            :documentation "Stores all online/active players in world"))
+            :documentation "Stores all online/active players in world")
+   (objects :initarg :objects
+            :accessor world-objects
+            :initform (make-hash-table :test #'eql)
+            :documentation "All objects in the world, keyed by world-level ID.")
+   (rooms :initarg :rooms
+          :accessor world-rooms
+          :initform (make-hash-table :test #'eql)
+          :documentation "All rooms in the world, keyed by world-level ID."))
   (:documentation "Configuration root for the MUD world.  Rooms, guestbooks,
    and other objects are stored as independent BKNR persistent objects."))
 
@@ -27,9 +35,15 @@
   (incf (world-id-counter world)))
 
 (defun world-set-object-id! (world object)
-  "Assign a world-level ID to an object and return it."
+  "Assign a world-level ID to an object, register it in the world's
+indices, and return the object."
   (when (eq -1 (object-id object)) ;; Only set if unset
     (setf (object-id object) (world-gen-id! world)))
+  ;; Register in world's objects hash table
+  (setf (gethash (object-id object) (world-objects world)) object)
+  ;; Also register in rooms hash table if it's a room
+  (when (typep object 'mud-room)
+    (setf (gethash (object-id object) (world-rooms world)) object))
   object)
 
 (defun world-set-starting-room! (world room)
@@ -37,7 +51,7 @@
 
 (defun starting-room (world)
   "Get the starting room of the world."
-  (room-by-id (get-config-key world :starting-room-id)))
+  (world-room-by-id world (get-config-key world :starting-room-id)))
 
 (defun world-add-character! (world character)
   "Add a character to the world, placing them in the starting room."
@@ -80,3 +94,28 @@
   (dolist (player (characters world))
     (unless (and exclude-player (eq (object-id player) (object-id exclude-player)))
       (player-send-message player message))))
+
+;; ─── World-level object/room queries ─────────────────────────────────────
+
+(defun world-object-by-id (world object-id)
+  "Look up an object in the world by its world-level ID."
+  (gethash object-id (world-objects world)))
+
+(defun world-object-with-name (world name)
+  "Return all objects in the world with the given NAME."
+  (loop for obj being the hash-values of (world-objects world)
+        when (string-equal (object-name obj) name)
+        collect obj))
+
+(defun world-all-objects (world)
+  "Return all objects registered in the world."
+  (loop for obj being the hash-values of (world-objects world)
+        collect obj))
+
+(defun world-room-by-id (world room-id)
+  "Look up a room in the world by its world-level ID."
+  (gethash room-id (world-rooms world)))
+
+(defun world-total-rooms (world)
+  "Return the number of rooms in the world."
+  (hash-table-count (world-rooms world)))

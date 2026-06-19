@@ -8,7 +8,6 @@
    (filepath :initarg :filepath
              :accessor guestbook-filepath
              :documentation "File where the guestbook entries will be stored"))
-  (:metaclass bknr.indices:indexed-class)
   (:documentation "A guestbook in which characters can read and write messages."))
 
 (defun guestbook-load-from-csv (filepath)

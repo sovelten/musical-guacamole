@@ -17,11 +17,15 @@ These are the main layers of the code base:
   * network.lisp (main entry point, server start and thread control)
   * session.lisp (single user session object, input/output and helpers)
 
-### World - Deals with persistence storage and the main world model. We may decouple world model with persistence in the future.
+### World - Main world model. Keeps track of world objects and configuration.
 
   * world.lisp
 
-### Command Parser - This one is tricky, since commands receive input from user, manipulate the world and respond user. As much as possible we want to avoid exposure to the network. Generic methods are a way to do that.
+### Persistent World - Deals with persistence storage.
+
+  * persistent-world.lisp
+
+### Command Parser - This one is tricky, since commands receive input from user, manipulate the world and respond user. As much as possible we want to avoid exposure to the network. It should also not depend on the persistence layer.
 
   * command-handler.lisp 
 
