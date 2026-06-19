@@ -7,13 +7,13 @@
 (defvar *player-threads* (make-hash-table :test #'equal))
 (defvar *server-lock* (bordeaux-threads:make-lock "server-lock"))
 
-(defun handle-client (session)
+(defun handle-client (world session)
   "Main loop for handling a client connection."
   (let* ((guest-name (format nil "Guest~D" (random 10000)))
          (char-name (ask-input session "What is your name?" guest-name))
          (character (new-character char-name session)))
     (mud.utils:log-message "New connection: ~A" char-name)
-    (world-new-character character)
+    (world-new-character world character)
     (session-send-message session (room-describe (object-location character)))
     (session-send-message session "Welcome to the MUD!")
     (handler-case
@@ -68,7 +68,7 @@
       (remove-character (session-character session)))
     (session-disconnect session)))
 
-(defun accept-connections ()
+(defun accept-connections (world)
   "Accept incoming client connections."
   (handler-case
       (loop while *server-running*
@@ -81,7 +81,7 @@
                            (let ((session (new-session client-socket)))
                              ;; Start session thread
                              (let ((thread (bordeaux-threads:make-thread
-                                            (lambda () (handle-client session))
+                                            (lambda () (handle-client world session))
                                             :name (format nil "session-~A" (session-id session)))))
                                (mud.utils:log-message "Thread for session ~A created" (session-id session))
                                (setf (gethash (session-id session) *player-threads*) thread))))))
@@ -103,15 +103,14 @@
         (progn
           (mud.utils:log-error "Server is already running!")
           (return-from start-mud-server nil))
-        (progn
-          ;; Initialize world
-          (world-restore-or-initialize :force-new force-new)
+        ;; Initialize world
+        (let ((world (world-restore-or-initialize :force-new force-new)))
           (setf *server-socket*
                 (usocket:socket-listen host port :reuse-address t :backlog 5))
           (setf *server-running* t)
           (mud.utils:log-message "MUD Server started on ~A:~D" host port)
           (setf *acceptance-thread*
-                (bordeaux-threads:make-thread #'accept-connections :name "accept-connections"))
+                (bordeaux-threads:make-thread (lambda () (accept-connections world)) :name "accept-connections"))
           t))))
 
 (defun stop-mud-server ()

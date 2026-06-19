@@ -2,7 +2,7 @@
 
 (defclass mud-object ()
   ((id :initarg :id
-       :initform (mud.utils:make-id)
+       :initform -1 ;; Set id when persisted
        :accessor object-id
        :documentation "Unique identifier for this object")
    (name :initarg :name

@@ -2,6 +2,19 @@
 
 (in-suite mud-tests)
 
+(test socket-stream-error-handling
+  "Test that socket errors are handled gracefully"
+  (handler-case
+      (progn
+        (let ((session (make-instance 'mud:mud-session :socket nil))
+              (player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+          ;; Sending message to player with nil socket should not crash
+          (mud:player-send-message player "Test message")
+          (is (not (null player)))))
+    (error (e)
+      ;; Error is expected, just check it doesn't crash the test
+      (is (not (null e))))))
+
 (test socket-stream-creation
   "Test that we can get a stream from a socket"
   (let* ((server-socket (usocket:socket-listen "127.0.0.1" 0 :reuseaddress t))

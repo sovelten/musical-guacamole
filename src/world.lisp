@@ -3,9 +3,6 @@
 (defvar *players* (make-hash-table :test #'equal)
   "Hash table storing all active players, keyed by player object ID")
 
-(defvar *world* nil
-  "The single MUD world instance holding all persistent state")
-
 (defclass mud-world ()
   ((id-counter :initarg :id-counter
                :accessor world-id-counter
@@ -36,6 +33,17 @@
 
 (defun world-set-starting-room (world room)
   (setf (gethash :starting-room-id (world-config world)) (object-id room)))
+
+(defun starting-room (world)
+  "Get the starting room of the world."
+  (room-by-id (get-config-key :starting-room-id)))
+
+(defun world-new-character (world character)
+  "Add a character to the world, placing them in the starting room."
+  (let ((room (starting-room world)))
+    (setf (object-location character) room)
+    (room-add-object room character)
+    (add-character character)))
 
 ;; ─── Transient player management ────────────────────────────────────────────
 
@@ -81,10 +89,8 @@
     (unless (and exclude-player (eq (object-id player) (object-id exclude-player)))
       (player-send-message player message))))
 
-;; ─── BKNR Persistence ───────────────────────────────────────────────────────
-
 ;; ─── World queries ──────────────────────────────────────────────────────────
 
-(defun get-config-key (key)
+(defun get-config-key (world key)
   "Get a configuration value from the world config."
-  (gethash key (world-config *world*)))
+  (gethash key (world-config world)))

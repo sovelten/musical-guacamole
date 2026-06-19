@@ -23,8 +23,8 @@
 
 (test player-location
   "Test that player has a location"
-  (mud:world-restore-or-initialize)
-  (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-    (mud:world-new-character player)
+  (let ((world (mud:world-restore-or-initialize))
+        (player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
+    (mud:world-new-character world player)
     (is (not (null (mud:object-location player))))
     (is (typep (mud:object-location player) 'mud:mud-room))))

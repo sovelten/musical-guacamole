@@ -115,15 +115,14 @@ When FORCE-NEW is true any existing store data is wiped first."
   (let ((stored-worlds (bknr.datastore:store-objects-with-class 'persistent-world)))
     (if stored-worlds
         (progn
-          (setf *world* (first stored-worlds))
           (when *debug-mode*
-            (mud.utils:log-message "World restored from BKNR datastore.")))
-        (progn
-          (setf *world* (initial-world))
+            (mud.utils:log-message "World restored from BKNR datastore."))
+          (first stored-worlds))
+        (let ((world (initial-world)))
           (sync-world)
           (when *debug-mode*
-            (mud.utils:log-message "New world created and persisted.")))))
-  *world*)
+            (mud.utils:log-message "New world created and persisted."))
+          world))))
 
 ;; ─── World queries ──────────────────────────────────────────────────────────
 
@@ -138,14 +137,3 @@ When FORCE-NEW is true any existing store data is wiped first."
 (defun rooms ()
   "Return all persistent rooms."
   (bknr.datastore:store-objects-with-class 'persistent-room))
-
-(defun starting-room ()
-  "Get the starting room of the world."
-  (room-by-id (get-config-key :starting-room-id)))
-
-(defun world-new-character (character)
-  "Add a character to the world, placing them in the starting room."
-  (let ((room (starting-room)))
-    (setf (object-location character) room)
-    (room-add-object room character)
-    (add-character character)))
