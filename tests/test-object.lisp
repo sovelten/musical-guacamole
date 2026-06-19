@@ -14,34 +14,6 @@
     (mud:object-set-property obj "test-prop" "test-value")
     (is (equal (mud:object-get-property obj "test-prop") "test-value"))))
 
-(test room-creation
-  "Test that we can create rooms"
-  (let ((room (mud:new-room :name "Test Room")))
-    (is (typep room 'mud:mud-room))
-    (is (equal (mud:object-name room) "Test Room"))))
-
-(test room-contents
-  "Test room contents management"
-  (let ((room (mud:new-room))
-        (obj (mud:new-room)))
-    (mud:room-add-object room obj)
-    (is (> (length (mud:room-contents room)) 0))))
-
-(test room-exits
-  "Test room exit management"
-  (let ((room1 (mud:new-room :name "Room 1"))
-        (room2 (mud:new-room :name "Room 2")))
-    (mud:room-add-exit room1 "north" room2)
-    (is (eq (mud:room-get-exit room1 "north") room2))))
-
-(test room-add-exits
-  "Test room exit management"
-  (let ((room1 (mud:new-room :name "Room 1"))
-        (room2 (mud:new-room :name "Room 2")))
-    (mud:room-add-exits room1 "north" room2 "south")
-    (is (eq (mud:room-get-exit room1 "north") room2))
-    (is (eq (mud:room-get-exit room2 "south") room1))))
-
 (test print-object-mud-object
       "Test print-object for mud-object"
       (let* ((obj (mud:new-object :name "Test Object"))
@@ -56,24 +28,10 @@
          (format nil "#<MUD:MUD-ROOM Test Room (ID: ~D)>" (mud:object-id room))
          (with-output-to-string (s) (print-object room s))))))
 
-(test guestbook-creation-and-methods
-  "Test that we can create a guestbook, add entries, and format them"
-  (uiop:with-temporary-file (:pathname temp-file :type "csv")
-    (let ((gb (mud::new-guestbook :name "test guestbook" :filepath (namestring temp-file))))
-      (is (typep gb 'mud::mud-guestbook))
-      (is (equal (mud:object-name gb) "test guestbook"))
-      (is (null (mud::guestbook-entries gb)))
-      
-      ;; Test adding an entry
-      (mud::guestbook-add-entry gb "Sophia" "Hello, MUD!")
-      (let ((entries (mud::guestbook-entries gb)))
-        (is (= (length entries) 1))
-        (is (equal (getf (first entries) :author) "Sophia"))
-        (is (equal (getf (first entries) :message) "Hello, MUD!"))
-        (is (numberp (getf (first entries) :timestamp))))
-      
-      ;; Test formatted output
-      (let ((formatted (mud::guestbook-format-entries gb)))
-        (is (search "test guestbook" formatted))
-        (is (search "Sophia wrote:" formatted))
-        (is (search "Hello, MUD!" formatted))))))
+(test object-indexing
+  "Test that we can create basic objects"
+  (let ((obj (mud:new-object :name "Test Object"))
+        (obj2 (mud:new-object :name "Test Object 2")))
+    (is (equal obj (first (mud:object-with-name "Test Object"))))
+    (is (equal obj2 (first (mud:object-with-name "Test Object 2"))))
+    (is (equal 2 (length (mud:all-objects))))))

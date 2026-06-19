@@ -28,6 +28,8 @@
    #:guestbook-format-entries
    
    ;; World system
+   #:object-with-name
+   #:all-objects
    #:get-config-key
    #:mud-room
    #:new-room

@@ -28,6 +28,14 @@
 
 ;; ─── Persistent factory functions ───────────────────────────────────────────
 
+(defun new-persistent-object (&key (name "An Object") (description ""))
+  "Create a new persistent object stored in the BKNR datastore."
+  (make-instance 'persistent-object
+                 :name name
+                 :description description
+                 :type +object-type-room+
+                 :location nil))
+
 (defun new-persistent-room (&key (name "A Room") (description ""))
   "Create a new persistent room stored in the BKNR datastore."
   (make-instance 'persistent-room
