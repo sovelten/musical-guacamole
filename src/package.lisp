@@ -69,6 +69,10 @@
    #:character-inventory-remove
    #:player-send-message
    #:world-remove-character!
+   #:stream-session
+   #:session-stream
+   #:session-keepalive
+   #:session-disconnect
    
    ;; Command system
    #:process-command
