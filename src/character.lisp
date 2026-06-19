@@ -51,10 +51,3 @@
   "Send a message to a player. If NEWLINE is nil, don't add a trailing newline."
   (let ((session (character-session player)))
     (session-send-message session message :newline newline)))
-
-(defmethod s-serialization:serializable-slots ((object mud-character))
-  "Characters are runtime-only and should never be persisted.
-When the world is restored from prevalence, no characters are connected.
-Fresh characters are created by world-new-character when players log in."
-  (declare (ignore object))
-  '())

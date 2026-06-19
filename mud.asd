@@ -6,7 +6,6 @@
   :depends-on ("usocket"
                "bordeaux-threads"
                "str"
-               "cl-prevalence"
                "bknr.datastore"
                "bknr.indices"
                "bknr.utils"

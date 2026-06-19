@@ -16,51 +16,48 @@
   (:documentation "Configuration root for the MUD world.  Rooms, guestbooks,
    and other objects are stored as independent BKNR persistent objects."))
 
+(defun get-config-key (world key)
+  "Get a configuration value from the world config."
+  (gethash key (world-config world)))
+
 (defun new-world () (make-instance 'mud-world))
 
-(defun world-gen-id (world)
+(defun world-gen-id! (world)
   ;; Increment id counter and return new id
   (incf (world-id-counter world)))
 
-(defun world-add-room (world room)
-  "Assign a world-level ID to a room and return it."
-  (setf (object-id room) (world-gen-id world))
-  room)
-
-(defun world-add-object (world object)
+(defun world-set-object-id! (world object)
   "Assign a world-level ID to an object and return it."
-  (setf (object-id object) (world-gen-id world))
+  (when (eq -1 (object-id object)) ;; Only set if unset
+    (setf (object-id object) (world-gen-id! world)))
   object)
 
-(defun world-set-starting-room (world room)
+(defun world-set-starting-room! (world room)
   (setf (gethash :starting-room-id (world-config world)) (object-id room)))
 
 (defun starting-room (world)
   "Get the starting room of the world."
   (room-by-id (get-config-key world :starting-room-id)))
 
-(defun world-new-character (world character)
+(defun world-add-character! (world character)
   "Add a character to the world, placing them in the starting room."
   (let ((room (starting-room world)))
     (setf (object-location character) room)
     (room-add-object room character)
     (setf (gethash (object-id character) (world-players world)) character)))
 
-(defun total-players (world)
+(defun world-total-players (world)
   (hash-table-count (world-players world)))
 
-(defun world-remove-character (world character)
+(defun world-remove-character! (world character)
   "Remove a player from the world."
-  (mud.utils:log-message "Character ~A leaving" (object-name character))
   (let ((room (object-location character)))
-    (mud.utils:log-message "Removing from ~A" (object-name room))
     ;; Remove from room
     (when (typep room 'mud-room)
       (room-remove-object room character))
     ;; Remove from world
-    (mud.utils:log-message "Removing ~A from world" (object-name character))
     (remhash (object-id character) (world-players world))
-    (mud.utils:log-message "Removed")))
+    (mud.utils:log-message "~A removed from world" (object-name character))))
 
 (defun character-by-id (world char-id)
   "Get a player by ID."
@@ -83,9 +80,3 @@
   (dolist (player (characters world))
     (unless (and exclude-player (eq (object-id player) (object-id exclude-player)))
       (player-send-message player message))))
-
-;; ─── World queries ──────────────────────────────────────────────────────────
-
-(defun get-config-key (world key)
-  "Get a configuration value from the world config."
-  (gethash key (world-config world)))

@@ -39,8 +39,8 @@
    #:room-add-exits
    #:room-get-exit
    #:world-restore-or-initialize
-   #:world-new-character
-   #:world-add-room
+   #:world-add-character!
+   #:world-set-object-id!
    #:character-by-id
    #:room-by-id
    #:rooms
@@ -61,7 +61,7 @@
    #:character-inventory-add
    #:character-inventory-remove
    #:player-send-message
-   #:world-remove-character
+   #:world-remove-character!
    
    ;; Command system
    #:process-command

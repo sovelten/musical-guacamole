@@ -132,7 +132,7 @@ PLAYER is the character, ARGS is a raw string that the handler can parse as need
 (define-command "quit" (world player args)
   (declare (ignore args))
   (player-send-message player "Goodbye!")
-  (world-remove-character world player)
+  (world-remove-character! world player)
   (session-disconnect (character-session player)))
 
 (defun parse-command (input)

@@ -13,7 +13,7 @@
          (char-name (ask-input session "What is your name?" guest-name))
          (character (new-character char-name session)))
     (mud.utils:log-message "New connection: ~A" char-name)
-    (world-new-character world character)
+    (world-add-character! world character)
     (session-send-message session (room-describe (object-location character)))
     (session-send-message session "Welcome to the MUD!")
     (handler-case
@@ -65,7 +65,7 @@
     (mud.utils:log-message "Attempting to remove thread for session ~A" session-id)
     (remhash session-id *player-threads*)
     (when (session-character session)
-      (world-remove-character world (session-character session)))
+      (world-remove-character! world (session-character session)))
     (session-disconnect session)))
 
 (defun accept-connections (world)
@@ -147,7 +147,7 @@
       ;; Disconnect all players
       (let ((world (get-persistent-world)))
         (dolist (player (characters world))
-          (world-remove-character world player)
+          (world-remove-character! world player)
           (session-disconnect (character-session player))))
       
       (mud.utils:log-message "MUD Server stopped")
@@ -157,5 +157,5 @@
   "Get the current status of the server."
   (format nil "Server running: ~A~%Players online: ~D~%Rooms in world: ~D~%"
           (if *server-running* "Yes" "No")
-          (total-players (get-persistent-world))
+          (world-total-players (get-persistent-world))
           (total-rooms)))

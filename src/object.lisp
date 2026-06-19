@@ -2,7 +2,7 @@
 
 (defclass mud-object ()
   ((id :initarg :id
-       :initform -1 ;; Set id when persisted
+       :initform -1 ;; Set id when added to world
        :accessor object-id
        :documentation "Unique identifier for this object")
    (name :initarg :name

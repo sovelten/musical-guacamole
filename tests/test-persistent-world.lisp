@@ -21,7 +21,7 @@
                (is (subsetp initial-ids restored-ids))
                ;; Add a new room post-restart
                (let ((new-room (mud:new-room :name "Post-Restart Room")))
-                 (mud:world-add-room new-world new-room)
+                 (mud:world-set-object-id! new-world new-room)
                  (let ((new-id (mud:object-id new-room)))
                    (is (not (member new-id restored-ids))
                        "New object ID ~D conflicts with existing loaded room IDs: ~A"

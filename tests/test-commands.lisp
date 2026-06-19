@@ -6,7 +6,7 @@
   "Test the look command"
   (let ((world (mud:world-restore-or-initialize)))
     (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-      (mud:world-new-character world player)
+      (mud:world-add-character! world player)
       ;; The look command should work without crashing
       (mud:process-command world player "look")
       (is (not (null player))))))
@@ -15,7 +15,7 @@
   "Test the help command"
   (let ((world (mud:world-restore-or-initialize)))
     (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-      (mud:world-new-character world player)
+      (mud:world-add-character! world player)
       (mud:process-command world player "help")
       (is (not (null player))))))
 
@@ -23,7 +23,7 @@
   "Test the exits command"
   (let ((world (mud:world-restore-or-initialize)))
     (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-      (mud:world-new-character world player)
+      (mud:world-add-character! world player)
       (mud:process-command world player "exits")
       (is (not (null player))))))
 
@@ -31,7 +31,7 @@
   "Test the inventory command"
   (let ((world (mud:world-restore-or-initialize)))
     (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-      (mud:world-new-character world player)
+      (mud:world-add-character! world player)
       (mud:process-command world player "inventory")
       (is (not (null player))))))
 
@@ -39,7 +39,7 @@
   "Test the go command"
   (let ((world (mud:world-restore-or-initialize)))
     (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-      (mud:world-new-character world player)
+      (mud:world-add-character! world player)
       (let ((start-room (mud:object-location player)))
         ;; Try to go north (should work from starting room)
         (mud:process-command world player "go north")
@@ -50,7 +50,7 @@
   "Test unknown command handling"
   (let ((world (mud:world-restore-or-initialize)))
     (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil))))
-      (mud:world-new-character world player)
+      (mud:world-add-character! world player)
       ;; Unknown command should not crash
       (mud:process-command world player "blahblah")
       (is (not (null player))))))
@@ -60,7 +60,7 @@
   (let ((world (mud:world-restore-or-initialize)))
     (let ((player (mud:new-character "TestPlayer" (make-instance 'mud:mud-session :socket nil)))
           (captured-messages '()))
-      (mud:world-new-character world player)
+      (mud:world-add-character! world player)
       (let ((original-send-message (fdefinition 'mud:player-send-message)))
         (unwind-protect
              (progn
