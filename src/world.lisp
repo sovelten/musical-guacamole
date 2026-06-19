@@ -1,8 +1,5 @@
 (in-package #:mud)
 
-(defvar *players* (make-hash-table :test #'equal)
-  "Hash table storing all active players, keyed by player object ID")
-
 (defclass mud-world ()
   ((id-counter :initarg :id-counter
                :accessor world-id-counter
@@ -11,7 +8,11 @@
    (config :initarg :config
            :accessor world-config
            :initform (make-hash-table :test #'eq)
-           :documentation "Configuration hash table (keys are keywords)."))
+           :documentation "Configuration hash table (keys are keywords).")
+   (players :initarg :players
+            :accessor world-players
+            :initform (make-hash-table :test #'equal)
+            :documentation "Stores all online/active players in world"))
   (:documentation "Configuration root for the MUD world.  Rooms, guestbooks,
    and other objects are stored as independent BKNR persistent objects."))
 
@@ -43,18 +44,12 @@
   (let ((room (starting-room world)))
     (setf (object-location character) room)
     (room-add-object room character)
-    (add-character character)))
+    (setf (gethash (object-id character) (world-players world)) character)))
 
-;; ─── Transient player management ────────────────────────────────────────────
+(defun total-players (world)
+  (hash-table-count (world-players world)))
 
-(defun total-players ()
-  (hash-table-count *players*))
-
-(defun add-character (character)
-  "Add a player to the world."
-  (setf (gethash (object-id character) *players*) character))
-
-(defun remove-character (character)
+(defun world-remove-character (world character)
   "Remove a player from the world."
   (mud.utils:log-message "Character ~A leaving" (object-name character))
   (let ((room (object-location character)))
@@ -64,7 +59,7 @@
       (room-remove-object room character))
     ;; Remove from world
     (mud.utils:log-message "Removing ~A from world" (object-name character))
-    (remhash (object-id character) *players*)
+    (remhash (object-id character) (world-players world))
     (mud.utils:log-message "Removed")))
 
 (defun character-by-id (char-id)

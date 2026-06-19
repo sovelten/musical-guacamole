@@ -65,7 +65,7 @@
     (mud.utils:log-message "Attempting to remove thread for session ~A" session-id)
     (remhash session-id *player-threads*)
     (when (session-character session)
-      (remove-character (session-character session)))
+      (world-remove-character world (session-character session)))
     (session-disconnect session)))
 
 (defun accept-connections (world)
@@ -146,7 +146,7 @@
       
       ;; Disconnect all players
       (dolist (player (characters))
-        (progn (remove-character player)
+        (progn (world-remove-character (get-persistent-world) player)
                (session-disconnect (character-session player))))
       
       (mud.utils:log-message "MUD Server stopped")
@@ -156,5 +156,5 @@
   "Get the current status of the server."
   (format nil "Server running: ~A~%Players online: ~D~%Rooms in world: ~D~%"
           (if *server-running* "Yes" "No")
-          (total-players)
+          (total-players (get-persistent-world))
           (total-rooms)))

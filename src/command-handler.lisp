@@ -126,7 +126,7 @@
 (define-command "quit" (player args)
   (declare (ignore args))
   (player-send-message player "Goodbye!")
-  (remove-character player)
+  (world-remove-character player)
   (session-disconnect (character-session player)))
 
 (defun parse-command (input)

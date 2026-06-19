@@ -62,7 +62,7 @@
    #:character-inventory-add
    #:character-inventory-remove
    #:player-send-message
-   #:remove-character
+   #:world-remove-character
    
    ;; Command system
    #:process-command

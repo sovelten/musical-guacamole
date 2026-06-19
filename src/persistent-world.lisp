@@ -23,7 +23,8 @@
             (guestbook-load-from-csv (pathname fp))))))
 
 (defwrapping-persistent-class persistent-world (mud-world)
-  ())
+  ()
+  (:transient-slots players))
 
 ;; ─── Persistent factory functions ───────────────────────────────────────────
 
@@ -125,6 +126,11 @@ When FORCE-NEW is true any existing store data is wiped first."
           world))))
 
 ;; ─── World queries ──────────────────────────────────────────────────────────
+
+(defun get-persistent-world ()
+  (let ((worlds (bknr.datastore:store-objects-with-class 'persistent-world)))
+    (when worlds
+      (first worlds))))
 
 (defun total-rooms ()
   "Return the number of persistent rooms."
