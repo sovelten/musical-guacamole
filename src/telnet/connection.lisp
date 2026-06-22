@@ -5,23 +5,22 @@
 ;;;;   2. Creates a binary stream for byte-level I/O
 ;;;;   3. Implements RFC 854 telnet protocol processing (IAC escaping,
 ;;;;      option negotiation, subnegotiation)
-;;;;   4. Exposes clean character-stream interfaces for the application layer
-;;;;
-;;;; The design avoids SBCL internals for keepalive by using flexi-streams
-;;;; for the binary/character encoding boundary and usocket for all socket
-;;;; operations.  The only platform-specific code is in %socket-fd and
-;;;; %make-binary-fd-stream, which are isolated and trivial to port.
+;;;;   4. Uses flexi-streams for UTF-8 ↔ bytes encoding
 ;;;;
 ;;;; Architecture:
 ;;;;   Application (character I/O)
 ;;;;        ↑ ↓
-;;;;   flexi-stream (UTF-8 ↔ bytes)
+;;;;   flexi-streams (string-to-octets / octets-to-string)
 ;;;;        ↑ ↓
 ;;;;   Telnet IAC processor (escape/unescape, command handling)
 ;;;;        ↑ ↓
 ;;;;   Binary stream (from socket FD)
 ;;;;
-;;;; Inspired by busybox telnetd's clean separation of protocol and I/O.
+;;;; The binary stream is created directly from the socket FD so we
+;;;; have full control over byte-level I/O.  The usocket's character
+;;;; stream is never used — we keep the usocket only for wait-for-input
+;;;; and socket-close.  This avoids the SBCL-internals hack in the old
+;;;; session-keepalive (which wrote raw bytes through sb-unix:unix-write).
 
 (in-package #:telnet)
 
@@ -30,8 +29,7 @@
 ;;; ----------------------------------------------------------------
 
 (defun %socket-fd (usocket)
-  "Extract the native OS file descriptor from a usocket.
-Returns NIL if the platform is not supported."
+  "Extract the native OS file descriptor from a usocket."
   #+sbcl
   (let ((native (usocket:socket usocket)))
     (when (typep native 'sb-bsd-sockets:socket)
@@ -49,49 +47,21 @@ Returns NIL if the platform is not supported."
 ;;; Open a binary stream on a socket FD
 ;;; ----------------------------------------------------------------
 
-(defun %make-binary-fd-stream (fd direction)
-  "Create a binary (unsigned-byte 8) stream on the given file descriptor.
-DIRECTION is :io, :input, or :output."
-  (ecase direction
-    (:io
-     #+sbcl
-     (sb-sys:make-fd-stream fd
-                             :input t :output t
-                             :element-type '(unsigned-byte 8)
-                             :buffering :full
-                             :name "telnet-binary-stream")
-     #+ccl
-     (ccl:make-fd-stream fd :direction :io :element-type '(unsigned-byte 8))
-     #+ecl
-     (ext:make-stream-from-fd fd :direction :io :element-type '(unsigned-byte 8))
-     #-(or sbcl ccl ecl)
-     (error "telnet: unsupported Lisp implementation."))
-    (:input
-     #+sbcl
-     (sb-sys:make-fd-stream fd
-                             :input t
-                             :element-type '(unsigned-byte 8)
-                             :buffering :full
-                             :name "telnet-binary-input-stream")
-     #+ccl
-     (ccl:make-fd-stream fd :direction :input :element-type '(unsigned-byte 8))
-     #+ecl
-     (ext:make-stream-from-fd fd :direction :input :element-type '(unsigned-byte 8))
-     #-(or sbcl ccl ecl)
-     (error "telnet: unsupported Lisp implementation."))
-    (:output
-     #+sbcl
-     (sb-sys:make-fd-stream fd
-                             :output t
-                             :element-type '(unsigned-byte 8)
-                             :buffering :full
-                             :name "telnet-binary-output-stream")
-     #+ccl
-     (ccl:make-fd-stream fd :direction :output :element-type '(unsigned-byte 8))
-     #+ecl
-     (ext:make-stream-from-fd fd :direction :output :element-type '(unsigned-byte 8))
-     #-(or sbcl ccl ecl)
-     (error "telnet: unsupported Lisp implementation."))))
+(defun %make-binary-fd-stream (fd)
+  "Create a binary (unsigned-byte 8) I/O stream on the given file descriptor.
+The stream does NO character encoding — byte I/O is direct."
+  #+sbcl
+  (sb-sys:make-fd-stream fd
+                          :input t :output t
+                          :element-type '(unsigned-byte 8)
+                          :buffering :full
+                          :name "telnet-binary-stream")
+  #+ccl
+  (ccl:make-fd-stream fd :direction :io :element-type '(unsigned-byte 8))
+  #+ecl
+  (ext:make-stream-from-fd fd :direction :io :element-type '(unsigned-byte 8))
+  #-(or sbcl ccl ecl)
+  (error "telnet: unsupported Lisp implementation."))
 
 ;;; ----------------------------------------------------------------
 ;;; Telnet connection class
@@ -101,11 +71,14 @@ DIRECTION is :io, :input, or :output."
   ((usocket
     :initarg :usocket
     :reader telnet-conn-usocket
-    :documentation "The usocket for this connection (kept for close/disconnect).")
+    :documentation "The usocket (for wait-for-input and close).")
    (raw-stream
     :initarg :raw-stream
     :reader telnet-conn-raw-stream
-    :documentation "Binary (unsigned-byte 8) stream to the socket.")
+    :documentation "Binary (unsigned-byte 8) stream to the socket.
+All I/O goes through this stream.  Telnet protocol commands are
+read/written directly.  Application data is encoded/decoded via
+flexi-streams:string-to-octets and octets-to-string.")
    (protocol
     :initarg :protocol
     :reader telnet-conn-protocol
@@ -122,9 +95,8 @@ DIRECTION is :io, :input, or :output."
    (read-buffer
     :initform (make-array 256 :element-type '(unsigned-byte 8)
                                 :adjustable t :fill-pointer 0)
-    :documentation "Accumulator for UTF-8 bytes being read from the socket.
-After IAC processing, non-command bytes land here before being decoded
-into characters.")
+    :documentation "Accumulator for UTF-8 bytes after IAC processing.
+Decoded to characters via flexi-streams:octets-to-string.")
    (line-buffer
     :initform (make-array 256 :element-type 'character
                                :adjustable t :fill-pointer 0)
@@ -142,14 +114,20 @@ Provides:
 ;;; ----------------------------------------------------------------
 
 (defun make-telnet-connection (usocket)
-  "Create a new telnet-connection from an accepted usocket.
+  "Create a new telnet-connection from a usocket.
 
-Performs initial telnet option negotiation (sends WILL/WONT/DO/DONT sequence)
-and returns a ready-to-use telnet-connection.
+Duplicates the socket FD to create a dedicated binary stream, keeping
+the usocket's character stream open only for compatibility (it is
+never read from).  Performs initial RFC 854 option negotiation.
 
-USOCKET must be a usocket:stream-usocket from usocket:socket-accept."
+USOCKET must be a usocket:stream-usocket from usocket:socket-accept
+or usocket:socket-connect."
   (let* ((fd (%socket-fd usocket))
-         (raw-stream (%make-binary-fd-stream fd :io))
+         ;; Duplicate the FD so the binary stream has its own
+         ;; independent file descriptor.  This prevents the usocket
+         ;; character stream's buffer from stealing data meant for us.
+         (binary-fd (sb-posix:dup fd))
+         (raw-stream (%make-binary-fd-stream binary-fd))
          (protocol (make-instance 'telnet-protocol))
          (conn (make-instance 'telnet-connection
                               :usocket usocket
@@ -173,8 +151,7 @@ USOCKET must be a usocket:stream-usocket from usocket:socket-accept."
 
 (defun %read-byte-into (stream buffer pos)
   "Read one byte from STREAM and store it at POS in BUFFER.
-Returns the byte value, or :eof if the stream is exhausted,
-or signals telnet-connection-lost on error."
+Returns the byte value, or :eof if the stream is exhausted."
   (handler-case
       (let ((b (read-byte stream nil :eof)))
         (if (eq b :eof)
@@ -213,7 +190,6 @@ Side-effects: may write negotiation responses to the raw stream."
            ((and (> (fill-pointer buf) 0)
                  (= (aref buf (1- (fill-pointer buf))) iac)
                  (= byte se))
-            ;; Remove the trailing IAC from buffer
             (decf (fill-pointer buf))
             (let ((option (aref buf 0))
                   (data (make-array (- (fill-pointer buf) 1)
@@ -222,19 +198,16 @@ Side-effects: may write negotiation responses to the raw stream."
                 (replace data buf :start2 1))
               (setf (fill-pointer buf) 0)
               (setf (telnet-in-subneg-p protocol) nil)
-              ;; Process the completed subneg
               (let ((responses (telnet-process-subnegotiation protocol option data)))
                 (dolist (resp responses)
                   (handler-case (write-sequence resp raw-stream)
                     (error () nil)))
                 (when responses (force-output raw-stream)))))
-           ;; IAC not followed by SE — accumulate IAC and this byte
+           ;; IAC IAC inside subneg — literal 255
            ((and (> (fill-pointer buf) 0)
                  (= (aref buf (1- (fill-pointer buf))) iac)
                  (= byte iac))
-            ;; IAC IAC inside subneg — keep one IAC as literal data
             (vector-push-extend byte buf))
-           ;; Normal subneg byte
            (t
             (vector-push-extend byte buf)))
          :subneg-incomplete))
@@ -243,7 +216,7 @@ Side-effects: may write negotiation responses to the raw stream."
       ((= byte iac)
        :iac-pending)
 
-      ;; Regular data byte — accumulate into read buffer
+      ;; Regular data byte — accumulate
       (t
        (vector-push-extend byte (slot-value conn 'read-buffer))
        :data))))
@@ -258,28 +231,17 @@ Writes any negotiation responses to the raw stream."
   (let ((protocol (telnet-conn-protocol conn))
         (raw-stream (telnet-conn-raw-stream conn)))
     (cond
-      ;; Subnegotiation begin (SB = 250)
       ((= command sb)
        (setf (telnet-in-subneg-p protocol) t)
        (setf (fill-pointer (telnet-subneg-buffer protocol)) 0))
-
-      ;; No Operation (NOP = 241) — keepalive ack, silently ignore
       ((= command nop) nil)
-
-      ;; Data Mark (DM = 242) — silently ignore (we don't use urgent data)
       ((= command dm) nil)
-
-      ;; WILL/WONT/DO/DONT — option negotiation
       ((or (= command will) (= command wont) (= command do) (= command dont))
        (let ((responses (telnet-process-command protocol command option)))
          (dolist (resp responses)
-           (handler-case
-               (write-sequence resp raw-stream)
+           (handler-case (write-sequence resp raw-stream)
              (error () nil)))
-         (when responses
-           (force-output raw-stream))))
-
-      ;; Other commands (AYT, IP, AO, BREAK, etc.) — silently ignore
+         (when responses (force-output raw-stream))))
       (t nil))))
 
 ;;; ----------------------------------------------------------------
@@ -288,7 +250,7 @@ Writes any negotiation responses to the raw stream."
 
 (defun %flush-read-buffer (conn)
   "Decode accumulated bytes in the read buffer to characters,
-appending them to the line buffer.  Clears the read buffer."
+appending them to the line buffer.  Uses flexi-streams for UTF-8 decode."
   (let ((buf (slot-value conn 'read-buffer))
         (line (slot-value conn 'line-buffer)))
     (when (> (fill-pointer buf) 0)
@@ -298,7 +260,6 @@ appending them to the line buffer.  Clears the read buffer."
              (str (handler-case
                       (flexi-streams:octets-to-string bytes :external-format :utf-8)
                     (error ()
-                      ;; On decode error, use replacement chars
                       (flexi-streams:octets-to-string
                        bytes :external-format '(:utf-8 :replacement #\?))))))
         (setf (fill-pointer buf) 0)
@@ -321,35 +282,35 @@ Returns (values nil :connection-lost) on fatal error."
     ;; Return buffered characters first
     (when (> (fill-pointer line) 0)
       (let ((c (aref line 0)))
-        ;; Shift buffer left
         (replace line line :start2 1 :end2 (fill-pointer line))
         (decf (fill-pointer line))
         (return-from telnet-read-char (values c nil))))
 
-    ;; Check for data availability
-    (let ((socket (telnet-conn-usocket conn)))
-      (when socket
-        (let ((ready (handler-case
-                         (usocket:wait-for-input socket :timeout timeout :ready-only t)
-                       (error () nil))))
-          (when (null ready)
-            (return-from telnet-read-char (values nil :timeout))))))
+    ;; Check for data availability using listen on the binary stream.
+    ;; We use listen (not usocket:wait-for-input) because the usocket
+    ;; character stream would steal bytes from the kernel buffer.
+    (let* ((raw-stream (telnet-conn-raw-stream conn))
+           (deadline (+ (get-internal-real-time)
+                        (* timeout internal-time-units-per-second))))
+      (loop
+        (when (listen raw-stream)
+          (return))
+        (let ((remaining (- deadline (get-internal-real-time))))
+          (when (<= remaining 0)
+            (return-from telnet-read-char (values nil :timeout)))
+          (sleep (min 0.05 (/ remaining internal-time-units-per-second))))))
 
-    ;; Read and process bytes
+    ;; Read and process bytes from the raw binary stream
     (let* ((raw-stream (telnet-conn-raw-stream conn))
            (buf (slot-value conn 'read-buffer)))
-      ;; Clear read buffer
       (setf (fill-pointer buf) 0)
 
-      ;; Read one byte
       (let ((b (%read-byte-into raw-stream buf 0)))
         (when (eq b :eof)
           (setf (telnet-connection-alive-p conn) nil)
           (return-from telnet-read-char (values nil :eof)))
 
-        ;; Process the byte
         (if (= b iac)
-            ;; IAC — read the command byte
             (let ((cmd (%read-byte-into raw-stream buf 1)))
               (when (eq cmd :eof)
                 (setf (telnet-connection-alive-p conn) nil)
@@ -365,7 +326,6 @@ Returns (values nil :connection-lost) on fatal error."
                 ((= cmd sb)
                  (setf (telnet-in-subneg-p (telnet-conn-protocol conn)) t)
                  (setf (fill-pointer (telnet-subneg-buffer (telnet-conn-protocol conn))) 0)
-                 ;; Read subneg data until IAC SE
                  (loop
                    (let ((sbb (%read-byte-into raw-stream buf 0)))
                      (when (eq sbb :eof)
@@ -375,7 +335,7 @@ Returns (values nil :connection-lost) on fatal error."
                      (when (not (telnet-in-subneg-p (telnet-conn-protocol conn)))
                        (return)))))
 
-                ;; WILL/WONT/DO/DONT — option negotiation (3-byte)
+                ;; WILL/WONT/DO/DONT — 3-byte negotiation
                 ((or (= cmd will) (= cmd wont) (= cmd do) (= cmd dont))
                  (let ((opt (%read-byte-into raw-stream buf 2)))
                    (when (eq opt :eof)
@@ -383,11 +343,11 @@ Returns (values nil :connection-lost) on fatal error."
                      (return-from telnet-read-char (values nil :eof)))
                    (%handle-telnet-command conn cmd opt)))
 
-                ;; Other 2-byte commands (NOP, DM, AYT, IP, AO, BREAK, EC, EL, GA)
+                ;; Other 2-byte commands
                 (t
                  (%handle-telnet-command conn cmd 0)))))
 
-            ;; Not IAC — data byte, already in buf
+            ;; Not IAC — data byte, already in buf, decode it
             (%flush-read-buffer conn)))
 
       ;; Try to return a character from the line buffer
@@ -398,7 +358,6 @@ Returns (values nil :connection-lost) on fatal error."
           (return-from telnet-read-char (values c nil))))
 
       ;; No character yet — data was consumed by protocol processing
-      ;; Return timeout so caller retries
       (values nil :timeout)))
 
 ;;; ----------------------------------------------------------------
@@ -420,7 +379,6 @@ Returns (values nil :connection-lost) on error."
                       (* timeout internal-time-units-per-second)))
          (line (slot-value conn 'line-buffer))
          (saw-cr nil))
-    ;; Clear any leftover data in line buffer
     (setf (fill-pointer line) 0)
     (setf (fill-pointer (slot-value conn 'read-buffer)) 0)
 
@@ -435,42 +393,34 @@ Returns (values nil :connection-lost) on error."
                                             (/ remaining
                                                internal-time-units-per-second)))
           (cond
-            ((and (null char) (eq status :timeout))
-             ;; No data yet, keep polling (caller should send keepalive)
-             nil)
+            ((and (null char) (eq status :timeout)) nil)
 
             ((and (null char) (or (eq status :eof) (eq status :connection-lost)))
              (return (values nil status)))
 
-            ;; CR — could be CR LF or CR NUL
             ((char= char #\Return)
              (setf saw-cr t))
 
-            ;; LF after CR — line complete
             ((and saw-cr (char= char #\Newline))
              (let ((result (coerce line 'string)))
                (setf (fill-pointer line) 0)
                (return (values result nil))))
 
-            ;; NUL after CR — line complete (RFC 854)
             ((and saw-cr (char= char #\Null))
              (let ((result (coerce line 'string)))
                (setf (fill-pointer line) 0)
                (return (values result nil))))
 
-            ;; LF without CR — line complete (non-standard but common)
             ((char= char #\Newline)
              (let ((result (coerce line 'string)))
                (setf (fill-pointer line) 0)
                (return (values result nil))))
 
-            ;; Any other char after CR — the CR was standalone
             (saw-cr
              (setf saw-cr nil)
              (vector-push-extend #\Return line)
              (vector-push-extend char line))
 
-            ;; Normal character
             (t
              (vector-push-extend char line))))))))
 
@@ -493,9 +443,7 @@ IAC bytes (255) in the output are automatically escaped as IAC IAC."
 
   (bordeaux-threads:with-lock-held ((telnet-conn-lock conn))
     (let* ((raw-stream (telnet-conn-raw-stream conn))
-           ;; Encode string to UTF-8 bytes
            (octets (flexi-streams:string-to-octets string :external-format :utf-8))
-           ;; Add line ending
            (ending (ecase end
                      (:crlf #(13 10))
                      (:cr   #(13))
@@ -527,8 +475,8 @@ IAC bytes (255) in the output are automatically escaped as IAC IAC."
 ;;; ----------------------------------------------------------------
 
 (defun telnet-write-raw (conn byte-vector)
-  "Write raw bytes to the connection.  Useful for sending protocol
-commands without IAC escaping."
+  "Write raw bytes to the connection without IAC escaping.
+Useful for sending protocol commands."
   (unless (telnet-connection-alive-p conn)
     (error 'telnet-connection-lost :message "Connection is closed"))
 
@@ -551,15 +499,11 @@ commands without IAC escaping."
 ;;; ----------------------------------------------------------------
 
 (defun telnet-send-nop (conn)
-  "Send a Telnet NOP (No Operation) command.
-This is the RFC 854-compliant way to verify the connection is still alive
-without sending any application data."
+  "Send a Telnet NOP (No Operation) command (RFC 854 keepalive)."
   (handler-case
       (telnet-write-raw conn (make-command-1 nop))
-    (telnet-connection-lost ()
-      nil)
-    (telnet-error ()
-      nil)))
+    (telnet-connection-lost () nil)
+    (telnet-error () nil)))
 
 ;;; ----------------------------------------------------------------
 ;;; Public: Close the connection
@@ -571,16 +515,17 @@ without sending any application data."
     (setf (telnet-connection-alive-p conn) nil)
     (handler-case
         (progn
+          ;; Close the binary stream first
           (when (telnet-conn-raw-stream conn)
             (close (telnet-conn-raw-stream conn)))
+          ;; Then close the usocket
           (when (telnet-conn-usocket conn)
             (usocket:socket-close (telnet-conn-usocket conn))))
-      (error ()
-        nil)))
+      (error () nil)))
   nil)
 
 ;;; ----------------------------------------------------------------
-;;; Public: Stream access (for use as drop-in replacement)
+;;; Public: Stream access
 ;;; ----------------------------------------------------------------
 
 (defun telnet-connection-input-stream (conn)
