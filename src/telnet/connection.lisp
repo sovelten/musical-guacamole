@@ -566,13 +566,19 @@ this function has already consumed, looping forever until timeout."
 (defun telnet-write-string (conn string &key (end :crlf))
   "Write STRING to the telnet connection.
 
-END controls line ending translation:
+END controls the line ending appended after STRING:
   :CRLF — append CR LF (default, RFC 854 NVT standard)
   :CR   — append CR only
   :LF   — append LF only
   NIL   — no line ending appended
 
-IAC bytes (255) in the output are automatically escaped as IAC IAC."
+Two NVT transformations are applied to STRING's bytes:
+  * IAC (255) is escaped as IAC IAC.
+  * A bare LF (10) that is not already preceded by CR (13) is emitted as
+    CR LF.  Per RFC 854 the NVT end-of-line is CR LF, so this makes
+    multi-line output (e.g. room descriptions containing \\n) render
+    correctly on a real telnet terminal regardless of whether the client
+    is in line mode or character/raw mode."
   (unless (telnet-connection-alive-p conn)
     (error 'telnet-connection-lost :message "Connection is closed"))
 
@@ -586,11 +592,16 @@ IAC bytes (255) in the output are automatically escaped as IAC IAC."
                      ((nil) #()))))
       (handler-case
           (progn
-            ;; Write string bytes with IAC escaping
-            (loop for b across octets do
-              (write-byte b raw-stream)
-              (when (= b iac)
-                (write-byte iac raw-stream)))
+            ;; Write string bytes with IAC escaping and bare-LF -> CR LF
+            ;; normalisation.
+            (let ((prev -1))
+              (loop for b across octets do
+                (when (and (= b 10) (/= prev 13))
+                  (write-byte 13 raw-stream))
+                (write-byte b raw-stream)
+                (when (= b iac)
+                  (write-byte iac raw-stream))
+                (setf prev b)))
             ;; Write ending
             (loop for b across ending do
               (write-byte b raw-stream))

@@ -328,10 +328,20 @@ calls TELNET-INIT-NEGOTIATION."
 (defun telnet-init-negotiation (protocol)
   "Return the initial set of commands to send when a connection is established.
 
+The MUD operates in LINE MODE with CLIENT-SIDE (local) echo: the client
+collects a whole line, echoing each keystroke locally, and sends it to us
+on Enter; we read complete lines with TELNET-READ-LINE.
+
+Critically we do NOT offer WILL ECHO.  WILL ECHO tells the client \"the
+server will echo your input for you\", which makes typical telnet clients
+turn OFF local echo AND switch into character-at-a-time mode.  Since a
+line-based server does not echo individual keystrokes, the user would see
+nothing they type.  Leaving ECHO alone keeps the client in its default
+line mode with local echo, which is what we want.
+
 We request:
-  - DO Suppress Go Ahead    (we don't use half-duplex)
-  - WILL Suppress Go Ahead  (we don't send GA)
-  - WILL Echo               (we handle character echo on the server side)
+  - DO Suppress Go Ahead    (full-duplex; we never wait for the client's GA)
+  - WILL Suppress Go Ahead  (we never send GA ourselves)
   - DO NAWS                 (we want to know window dimensions)
   - DO Terminal Type        (we want to know the terminal type)
 
@@ -339,13 +349,9 @@ The commands are a list of byte-vectors ready to be written to the socket."
   ;; Built-in subnegotiation handlers (NAWS, TERMINAL-TYPE) are registered
   ;; automatically by INITIALIZE-INSTANCE on the protocol object.
 
-  ;; Mark options we want
-  ;; Local: we WILL do these
-  (let ((local-echo (ensure-option-state protocol :local +telnet-opt-echo+))
-        (local-sga  (ensure-option-state protocol :local +telnet-opt-suppress-go-ahead+)))
-    (setf (telnet-option-state-wanted local-echo) t
-          (telnet-option-state-pending local-echo) t
-          (telnet-option-state-wanted local-sga) t
+  ;; Local: we WILL suppress go-ahead.  (We deliberately do NOT want ECHO.)
+  (let ((local-sga (ensure-option-state protocol :local +telnet-opt-suppress-go-ahead+)))
+    (setf (telnet-option-state-wanted local-sga) t
           (telnet-option-state-pending local-sga) t))
 
   ;; Remote: we DO want these from the client
@@ -362,7 +368,6 @@ The commands are a list of byte-vectors ready to be written to the socket."
   ;; Build initial command list
   (list (make-command-2 do +telnet-opt-suppress-go-ahead+)
         (make-command-2 will +telnet-opt-suppress-go-ahead+)
-        (make-command-2 will +telnet-opt-echo+)
         (make-command-2 do +telnet-opt-naws+)
         (make-command-2 do +telnet-opt-terminal-type+)))
 
