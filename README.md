@@ -37,7 +37,7 @@ Very simple and raw at the moment, but the fact that it runs on lisp gives it so
 
 ```lisp
 # Navigate to project directory
-cd musical-guacamole
+cd apeiron-mud
 
 # In SBCL:
 (push #p"./" asdf:*central-registry*)
