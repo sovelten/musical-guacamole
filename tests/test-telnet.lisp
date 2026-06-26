@@ -458,3 +458,239 @@ to WRITE-STREAM."
       ;; write-stream is already closed; close the raw read stream only.
       (let ((raw (telnet::telnet-conn-raw-stream conn)))
         (when raw (ignore-errors (close raw :abort t)))))))
+
+;; ===============================================================
+;; TLS Support Tests
+;; ===============================================================
+
+;; ----------------------------------------------------------------------
+;; Test: telnet-tls-connection-p returns nil for plain connections
+;; ----------------------------------------------------------------------
+
+(test telnet-tls-connection-p-plain-returns-nil
+  "telnet-tls-connection-p should return nil for a plain (non-TLS) connection."
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           (is (not (telnet:telnet-tls-connection-p conn)))
+           "Plain connection should not be recognized as TLS")
+      (close-test-connection conn write-stream))))
+
+;; ----------------------------------------------------------------------
+;; Test: telnet-register-start-tls registers the option
+;; ----------------------------------------------------------------------
+
+(test telnet-register-start-tls-registers-option
+  "telnet-register-start-tls should mark the START_TLS option as wanted."
+  (let ((protocol (telnet:telnet-register-start-tls
+                   (make-instance 'telnet:telnet-protocol))))
+    (let ((state (telnet:telnet-local-option protocol
+                                             telnet:+telnet-opt-start-tls+)))
+      (is (not (null state))
+          "START_TLS option state should exist")
+      (is (telnet::telnet-option-state-wanted state)
+          "START_TLS should be wanted")
+      (is (telnet::telnet-option-state-pending state)
+          "START_TLS should be pending"))))
+
+;; ----------------------------------------------------------------------
+;; Test: START_TLS included in init negotiation when registered
+;; ----------------------------------------------------------------------
+
+(test telnet-start-tls-appears-in-init-negotiation
+  "When START_TLS is registered, the init negotiation should include
+WILL START_TLS (IAC WILL 46)."
+  (let* ((protocol (telnet:telnet-register-start-tls
+                    (make-instance 'telnet:telnet-protocol)))
+         (cmds (telnet:telnet-init-negotiation protocol))
+         (found-will-start-tls nil))
+    (dolist (cmd cmds)
+      ;; Look for IAC WILL 46 = #(255 251 46)
+      (when (and (= (length cmd) 3)
+                 (= (aref cmd 0) 255)     ; IAC
+                 (= (aref cmd 1) 251)     ; WILL
+                 (= (aref cmd 2) 46))     ; START_TLS
+        (setf found-will-start-tls t)))
+    (is-true found-will-start-tls
+             "Init negotiation should include WILL START_TLS")))
+
+;; ----------------------------------------------------------------------
+;; Test: DO START_TLS does not produce a response
+;; ----------------------------------------------------------------------
+
+(test telnet-do-start-tls-produces-no-response
+  "When we receive DO START_TLS (client accepting our WILL offer),
+the :around method should return NIL so no telnet response is sent."
+  (let* ((protocol (telnet:telnet-register-start-tls
+                    (make-instance 'telnet:telnet-protocol)))
+         ;; Simulate receiving DO START_TLS
+         (responses (telnet:telnet-process-command
+                     protocol
+                     telnet::do        ; DO = 253
+                     46)))               ; START_TLS option
+    (is (null responses)
+        "DO START_TLS should produce no telnet response bytes")))
+
+;; ----------------------------------------------------------------------
+;; Test: make-telnet-connection accepts custom protocol with START_TLS
+;; ----------------------------------------------------------------------
+
+(test telnet-make-connection-with-start-tls-protocol
+  "make-telnet-connection should accept a pre-configured protocol that
+has START_TLS registered."
+  (let* ((protocol (telnet:telnet-register-start-tls
+                    (make-instance 'telnet:telnet-protocol)))
+         (server (usocket:socket-listen "127.0.0.1" 0 :reuse-address t))
+         (port (usocket:get-local-port server))
+         conn)
+    (unwind-protect
+         (let ((server-thread
+                 (bt:make-thread
+                  (lambda ()
+                    (handler-case
+                        (let ((accepted (usocket:socket-accept server)))
+                          (setf conn
+                                (telnet:make-telnet-connection
+                                 accepted
+                                 :protocol protocol)))
+                      (error (e)
+                        (format t "~&Server error: ~A~%" e))))
+                  :name "tls-protocol-test")))
+           (sleep 0.2)
+           ;; Connect a client to trigger the server accept
+           (let ((client (usocket:socket-connect "127.0.0.1" port)))
+             (sleep 0.3)
+             (usocket:socket-close client))
+           (bt:join-thread server-thread)
+           (is (not (null conn)) "Connection should be created")
+           (when conn
+             ;; Verify the protocol has START_TLS registered
+             (let ((state (telnet:telnet-local-option
+                           (telnet::telnet-conn-protocol conn)
+                           telnet:+telnet-opt-start-tls+)))
+               (is (not (null state))
+                   "Connection protocol should have START_TLS state")
+               (is (telnet::telnet-option-state-wanted state)
+                   "START_TLS should be wanted on created connection"))))
+      (when conn
+        (ignore-errors (telnet:telnet-connection-close conn)))
+      (when server
+        (ignore-errors (usocket:socket-close server))))))
+
+;; ----------------------------------------------------------------------
+;; Test: TLS connection with self-signed cert (requires OpenSSL CLI)
+;; ----------------------------------------------------------------------
+
+(test telnet-tls-connect-with-self-signed-cert
+  "Test TLS connection with a generated self-signed certificate.
+Requires OpenSSL command-line tool to be installed."
+  (let ((temp-dir (uiop:subpathname (uiop:default-temporary-directory)
+                                     "mud-test-tls/")))
+    (unwind-protect
+         (let* ((cert-path (merge-pathnames "cert.pem" temp-dir))
+                (key-path (merge-pathnames "key.pem" temp-dir)))
+           ;; Generate a self-signed cert using OpenSSL
+           (ensure-directories-exist temp-dir)
+           (multiple-value-bind (stdout stderr exit)
+               (uiop:run-program
+                (list "openssl" "req" "-x509"
+                      "-newkey" "rsa:2048"
+                      "-keyout" (namestring key-path)
+                      "-out" (namestring cert-path)
+                      "-days" "1"
+                      "-nodes"
+                      "-subj" "/CN=localhost/O=MUD-Test")
+                :output nil
+                :ignore-error-status t)
+             (declare (ignore stdout stderr))
+             (unless (= exit 0)
+               (skip "OpenSSL not available for cert generation"))
+             (format t "~&Generated test cert at ~A~%" cert-path)
+             ;; Set up a TLS server and client
+             (let* ((server (usocket:socket-listen
+                             "127.0.0.1" 0 :reuse-address t))
+                    (port (usocket:get-local-port server))
+                    (server-conn nil)
+                    (client-data nil)
+                    (server-error nil))
+               (unwind-protect
+                    (progn
+                      ;; Server thread: accept and create TLS connection
+                      (let ((server-thread
+                              (bt:make-thread
+                               (lambda ()
+                                 (handler-case
+                                     (let* ((accepted
+                                             (usocket:socket-accept
+                                              server)))
+                                       (setf server-conn
+                                             (telnet:make-telnet-tls-connection
+                                              accepted
+                                              :certificate
+                                              (namestring cert-path)
+                                              :key
+                                              (namestring key-path))))
+                                   (error (e)
+                                     (setf server-error e)
+                                     (format t "~&Server error: ~A~%" e))))
+                               :name "tls-test-server")))
+                        ;; Let the server start accepting
+                        (sleep 0.3)
+                        ;; Client: connect via CL+SSL.
+                        ;; Keep socket/stream variables outside the
+                        ;; handler-case so cleanup can always reach them.
+                        (let ((client-sock nil)
+                              (ssl-client nil))
+                          (handler-case
+                              (progn
+                                (setf client-sock
+                                      (usocket:socket-connect
+                                       "127.0.0.1" port))
+                                (let ((client-stream
+                                        (usocket:socket-stream
+                                         client-sock)))
+                                  (setf ssl-client
+                                        (cl+ssl:make-ssl-client-stream
+                                         client-stream
+                                         :verify nil))
+                                  (write-sequence
+                                   (telnet::iac-escape
+                                    (telnet::make-command-2
+                                     telnet::do
+                                     telnet:+telnet-opt-suppress-go-ahead+))
+                                   ssl-client)
+                                  (force-output ssl-client)
+                                  (setf client-data :ok)))
+                            (error (e)
+                              (setf client-data e)))
+                          ;; Always join the server thread before
+                          ;; closing the client, so the server has
+                          ;; time to finish its encrypted init
+                          ;; negotiation without getting a RST.
+                          (bt:join-thread server-thread)
+                          ;; Now clean up client resources
+                          (when ssl-client
+                            (ignore-errors (close ssl-client)))
+                          (when client-sock
+                            (ignore-errors
+                             (usocket:socket-close client-sock)))))
+                      ;; Verify results
+                      (is (null server-error)
+                          (format nil "Server should not error: ~A"
+                                  server-error))
+                      (is (eq client-data :ok)
+                          (format nil "Client should connect via TLS: ~A"
+                                  client-data))
+                      (is (telnet:telnet-tls-connection-p server-conn)
+                          "Server connection should report TLS active"))
+                 ;; Cleanup
+                 (when server-conn
+                   (ignore-errors
+                    (telnet:telnet-connection-close server-conn)))
+                 (when server
+                   (ignore-errors (usocket:socket-close server))))))
+      ;; Clean up temp dir
+      (ignore-errors
+        (uiop:delete-directory-tree temp-dir
+                                    :validate (constantly t)
+                                    :if-does-not-exist :ignore))))))

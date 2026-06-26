@@ -368,10 +368,18 @@ The commands are a list of byte-vectors ready to be written to the socket."
           (telnet-option-state-pending remote-term) t))
 
   ;; Build initial command list
-  (list (make-command-2 do +telnet-opt-suppress-go-ahead+)
-        (make-command-2 will +telnet-opt-suppress-go-ahead+)
-        (make-command-2 do +telnet-opt-naws+)
-        (make-command-2 do +telnet-opt-terminal-type+)))
+  (let ((commands (list (make-command-2 do +telnet-opt-suppress-go-ahead+)
+                        (make-command-2 will +telnet-opt-suppress-go-ahead+)
+                        (make-command-2 do +telnet-opt-naws+)
+                        (make-command-2 do +telnet-opt-terminal-type+))))
+    ;; If START_TLS is wanted (registered via telnet-register-start-tls),
+    ;; include WILL START_TLS in the initial negotiation.
+    (let ((start-tls-state (gethash +telnet-opt-start-tls+
+                                    (telnet-local-options protocol))))
+      (when (and start-tls-state
+                 (telnet-option-state-wanted start-tls-state))
+        (push (make-command-2 will +telnet-opt-start-tls+) commands)))
+    (nreverse commands)))
 
 ;;; ----------------------------------------------------------------
 ;;; IAC Escaping

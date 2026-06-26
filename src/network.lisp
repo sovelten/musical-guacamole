@@ -54,7 +54,8 @@
                      ;; Check if this is a "broken pipe" or similar connection error
                      (let ((error-str (format nil "~A" e)))
                        (if (or (search "Broken pipe" error-str)
-                               (search "closed" error-str))
+                               (search "closed" error-str)
+                               (search "reset" error-str))
                            ;; Connection error, exit gracefully
                            (progn
                              (mud.utils:log-message "Client ~A connection lost" char-name)
@@ -87,7 +88,9 @@ is offered on each connection, allowing clients to upgrade to TLS."
                     (if (not *server-running*)
                         (usocket:socket-close client-socket)
                         (let ((session
-                                (if *server-tls-prefer-start-tls*
+                                (if (and *server-tls-prefer-start-tls*
+                                         *server-ssl-certificate*
+                                         *server-ssl-key*)
                                     (new-telnet-session
                                      client-socket
                                      :start-tls t
