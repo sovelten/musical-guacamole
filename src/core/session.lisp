@@ -23,6 +23,7 @@ The default method is a no-op."))
 
 (defclass mud-session ()
   ((id :initarg :id
+       :initform (make-id)
        :accessor session-id
        :documentation "Unique identifier for this object")
    (character :initarg :player

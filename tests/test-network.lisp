@@ -36,6 +36,27 @@
       (when accepted-socket (usocket:socket-close accepted-socket))
       (when server-socket (usocket:socket-close server-socket)))))
 
+(test session-thread-tracking
+  "Test that sessions can be tracked in a hash table keyed by
+session-id, mirroring the *player-threads* pattern in network.lisp."
+  (let ((table (make-hash-table :test #'equal))
+        (session-1 (make-instance 'apeiron.core:stream-session
+                                  :stream (make-string-output-stream)))
+        (session-2 (make-instance 'apeiron.core:stream-session
+                                  :stream (make-string-output-stream))))
+    ;; Store sessions keyed by session-id (as network.lisp does
+    ;; with *player-threads*)
+    (setf (gethash (apeiron.core:session-id session-1) table) :thread-a)
+    (setf (gethash (apeiron.core:session-id session-2) table) :thread-b)
+    ;; Retrieve and verify
+    (is (eq (gethash (apeiron.core:session-id session-1) table) :thread-a))
+    (is (eq (gethash (apeiron.core:session-id session-2) table) :thread-b))
+    ;; Remove and verify cleanup (as handle-client does)
+    (remhash (apeiron.core:session-id session-1) table)
+    (is (null (gethash (apeiron.core:session-id session-1) table)))
+    (is (eq (gethash (apeiron.core:session-id session-2) table) :thread-b)
+        "Other entries survive removal")))
+
 (test player-message-with-mock-socket
   "Test sending messages to a player with a real socket"
   (handler-case
