@@ -6,7 +6,7 @@
 ;; Explicitly load the ASDF system definitions
 (asdf:load-asd #P"./mud.asd")
 (asdf:load-asd #P"./mud-test.asd")
-(ql:quickload :mud)
+(ql:quickload :apeiron)
 
 ;; Now load the tests
 (ql:quickload :mud-test)

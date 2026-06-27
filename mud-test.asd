@@ -3,7 +3,7 @@
   :description "Tests for the MUD server"
   :author "Sophia"
   :license "MIT"
-  :depends-on ("mud" "fiveam")
+  :depends-on ("apeiron" "fiveam")
   :components ((:module "tests"
                 :components
                 ((:file "test-package")
