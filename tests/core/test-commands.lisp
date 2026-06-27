@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite core-suite)
 
 (test command-processing-look
   "Test the look command"

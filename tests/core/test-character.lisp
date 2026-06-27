@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite core-suite)
 
 (test player-creation
   "Test that we can create a player"

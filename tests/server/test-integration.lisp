@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite server-suite)
 
 (test network-quit-command-integration
   "Test a real client connecting, naming themselves, and executing the quit command."

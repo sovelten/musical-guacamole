@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite persistence-suite)
 
 (test world-initialization
   "Test that the world initializes properly"

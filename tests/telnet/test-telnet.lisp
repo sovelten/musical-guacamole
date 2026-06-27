@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite telnet-suite)
 
 ;; ---------------------------------------------------------------
 ;; Helpers: create a telnet-connection backed by a pipe,

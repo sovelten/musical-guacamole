@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite server-suite)
 
 (test socket-stream-error-handling
   "Test that socket errors are handled gracefully"

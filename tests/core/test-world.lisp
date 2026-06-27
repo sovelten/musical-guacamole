@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite core-suite)
 
 (test get-config-key
   "Test reading config keys from a world"

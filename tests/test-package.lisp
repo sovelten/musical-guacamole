@@ -5,12 +5,33 @@
         #:apeiron.persistence
         #:apeiron.server)
   (:export #:run-tests #:apeiron-tests
+           #:core-suite
+           #:telnet-suite
+           #:persistence-suite
+           #:server-suite
            #:setup-test-environment
            #:teardown-test-environment))
 
 (in-package #:apeiron-test)
 
-(def-suite apeiron-tests :description "Tests for the Apeiron MUD server")
+(def-suite apeiron-tests
+    :description "All Apeiron MUD tests")
+
+(def-suite core-suite
+    :in apeiron-tests
+    :description "Core module tests — objects, rooms, guestbook, characters, world, commands")
+
+(def-suite telnet-suite
+    :in apeiron-tests
+    :description "Telnet protocol tests")
+
+(def-suite persistence-suite
+    :in apeiron-tests
+    :description "Persistence module tests — BKNR datastore, world restore")
+
+(def-suite server-suite
+    :in apeiron-tests
+    :description "Server module tests — network, integration")
 
 (eval-when (:load-toplevel :execute)
   (setf *debug-mode* nil)

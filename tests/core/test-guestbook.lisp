@@ -1,6 +1,6 @@
 (in-package #:apeiron-test)
 
-(in-suite apeiron-tests)
+(in-suite core-suite)
 
 (test guestbook-creation-and-methods
   "Test that we can create a guestbook, add entries, and format them"
