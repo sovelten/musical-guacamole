@@ -14,6 +14,10 @@
   ()
   (:transient-slots properties entries))
 
+(defwrapping-persistent-class persistent-npc (mud-npc)
+  ()
+  (:transient-slots properties))
+
 (defmethod bknr.datastore:initialize-transient-instance ((gb persistent-guestbook))
   "Re-read guestbook entries from the CSV file after restore."
   (call-next-method)
@@ -43,6 +47,21 @@
                  :description description
                  :type +object-type-room+
                  :location nil))
+
+(defun new-persistent-npc (&key name description hp max-hp attack-min attack-max
+                               defeat-message victory-flag)
+  "Create a new persistent NPC stored in the BKNR datastore."
+  (let ((max-hp (or max-hp hp 10)))
+    (make-instance 'persistent-npc
+                   :name name
+                   :description description
+                   :type +object-type-character+
+                   :hp (or hp max-hp)
+                   :max-hp max-hp
+                   :attack-min attack-min
+                   :attack-max attack-max
+                   :defeat-message defeat-message
+                   :victory-flag victory-flag)))
 
 (defun new-persistent-guestbook (&key (name "a dusty guestbook") (filepath (namestring (merge-pathnames "guestbook.csv" *data-directory*))))
   "Create a new persistent guestbook stored in the BKNR datastore."
@@ -113,6 +132,8 @@ close/reopen cycles that trigger BKNR transaction log replay warnings."
         (room-add-exits gathering "east" desert "west")
         (room-add-exits gathering "west" swamp "east")
         (room-add-exits gathering "south" volcano "north")
+        ;; Desert door → shopping mall → Team Rocket cavern maze
+        (build-shopping-mall world desert)
         ;; Register all objects in the world
         (world-set-object-id! world guestbook)
         (world-set-object-id! world gathering)
@@ -145,6 +166,8 @@ When FORCE-NEW is true any existing store data is wiped first."
             (world-set-object-id! world obj))
           (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-guestbook))
             (world-set-object-id! world obj))
+          (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-npc))
+            (world-set-object-id! world obj))
           ;; Reset room contents (transient) before rebuilding from persistent
           ;; object locations, so transient objects from previous sessions
           ;; (e.g. characters added in earlier tests) don't accumulate.
@@ -162,6 +185,8 @@ When FORCE-NEW is true any existing store data is wiped first."
               (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-room))
                 (rebuild-room-contents obj))
               (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-guestbook))
+                (rebuild-room-contents obj))
+              (dolist (obj (bknr.datastore:store-objects-with-class 'persistent-npc))
                 (rebuild-room-contents obj))))
           (when *debug-mode*
             (mud.utils:log-message "World restored from BKNR datastore."))

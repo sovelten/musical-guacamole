@@ -26,13 +26,74 @@ PLAYER is the character, ARGS is a raw string that the handler can parse as need
         (room (object-location player)))
     (if (zerop (length direction))
         (player-send-message player "Go where? Usage: go <direction>")
-        (let ((target-room (room-get-exit room direction)))
-          (if target-room
-              (progn
-                (object-move player target-room)
-                (player-send-message player (format nil "You go ~A.~%" direction))
-                (player-send-message player (room-describe target-room)))
-              (player-send-message player "You can't go that way."))))))
+        (let ((block-msg (or (room-exit-blocked-p room player direction)
+                             (room-challenge-blocked-p room player direction))))
+          (if block-msg
+              (player-send-message player block-msg)
+              (let ((target-room (room-get-exit room direction)))
+                (if target-room
+                    (progn
+                      (object-move player target-room)
+                      (player-send-message player (format nil "You go ~A.~%" direction))
+                      (player-send-message player (room-describe target-room)))
+                    (player-send-message player "You can't go that way."))))))))
+
+(define-command "attack" (world player args)
+  (declare (ignore world))
+  (let ((room (object-location player)))
+    (if (zerop (length args))
+        (player-send-message player "Attack whom? Usage: attack <name>")
+        (let ((npc (find-npc-in-room room args)))
+          (if npc
+              (dolist (msg (combat-attack-npc player npc))
+                (player-send-message player msg))
+              (player-send-message player "No such foe here."))))))
+
+(define-command "examine" (world player args)
+  (declare (ignore world))
+  (let* ((room (object-location player))
+         (target-name (string-downcase args)))
+    (if (zerop (length args))
+        (player-send-message player "Examine what? Usage: examine <name>")
+        (let ((target
+               (or (find-npc-in-room room args)
+                   (find-if (lambda (obj)
+                              (and (not (eq obj player))
+                                   (search target-name (string-downcase (object-name obj)))))
+                            (room-contents room)))))
+          (if target
+              (player-send-message
+               player
+               (if (typep target 'mud-npc)
+                   (npc-describe target)
+                   (format nil "~A~%~A"
+                           (object-name target)
+                           (object-description target))))
+              (player-send-message player "You don't see that here."))))))
+
+(define-command "answer" (world player args)
+  (declare (ignore world))
+  (let ((room (object-location player)))
+    (if (zerop (length args))
+        (player-send-message player "Answer what? Usage: answer <text>")
+        (let* ((expected (object-get-property room "challenge-answer"))
+               (flag (object-get-property room "challenge-flag")))
+          (cond
+            ((null expected)
+             (player-send-message player "There is no challenge here to answer."))
+            ((string= (string-downcase args) (string-downcase expected))
+             (object-set-property player flag t)
+             (player-send-message player "Correct! The way forward opens."))
+            (t
+             (player-send-message player "Wrong answer. Try again.")))))))
+
+(define-command "status" (world player args)
+  (declare (ignore world args))
+  (player-ensure-combat-stats player)
+  (player-send-message player
+                       (format nil "HP: ~D/~D"
+                               (player-hp player)
+                               (player-max-hp player))))
 
 (define-command "eval" (world player args)
   (declare (ignore world))
