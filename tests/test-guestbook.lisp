@@ -1,6 +1,6 @@
-(in-package #:mud-test)
+(in-package #:apeiron-test)
 
-(in-suite mud-tests)
+(in-suite apeiron-tests)
 
 (test guestbook-creation-and-methods
   "Test that we can create a guestbook, add entries, and format them"

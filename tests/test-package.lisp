@@ -1,16 +1,16 @@
-(defpackage #:mud-test
+(defpackage #:apeiron-test
   (:use #:cl #:fiveam
         #:apeiron.core
         #:apeiron.core.utils
         #:apeiron.persistence
         #:apeiron.server)
-  (:export #:run-tests #:mud-tests
+  (:export #:run-tests #:apeiron-tests
            #:setup-test-environment
            #:teardown-test-environment))
 
-(in-package #:mud-test)
+(in-package #:apeiron-test)
 
-(def-suite mud-tests :description "Tests for the MUD server")
+(def-suite apeiron-tests :description "Tests for the Apeiron MUD server")
 
 (eval-when (:load-toplevel :execute)
   (setf *debug-mode* nil)
@@ -61,7 +61,7 @@
   (setup-test-environment)
   (unwind-protect
        (let ((*trace-output* (make-broadcast-stream))
-             (results (run 'mud-tests)))
+             (results (run 'apeiron-tests)))
          (let* ((fiveam-pkg (find-package :fiveam))
                 (passed-class (and fiveam-pkg
                                    (find-class (find-symbol "TEST-PASSED" fiveam-pkg) nil)))

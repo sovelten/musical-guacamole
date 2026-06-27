@@ -1,6 +1,6 @@
-(in-package #:mud-test)
+(in-package #:apeiron-test)
 
-(in-suite mud-tests)
+(in-suite apeiron-tests)
 
 (test network-quit-command-integration
   "Test a real client connecting, naming themselves, and executing the quit command."

@@ -1,6 +1,6 @@
-(in-package #:mud-test)
+(in-package #:apeiron-test)
 
-(in-suite mud-tests)
+(in-suite apeiron-tests)
 
 (test room-creation
   "Test that we can create rooms"
