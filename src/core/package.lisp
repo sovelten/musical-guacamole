@@ -74,7 +74,6 @@
    #:mud-session
    #:new-session
    #:session-id
-   #:session-socket
    #:session-character
 
    #:stream-session

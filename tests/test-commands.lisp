@@ -5,7 +5,8 @@
 (test command-processing-look
   "Test the look command"
   (let ((world (apeiron.persistence:world-restore-or-initialize)))
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-add-character! world player)
       ;; The look command should work without crashing
       (apeiron.core:process-command world player "look")
@@ -14,7 +15,8 @@
 (test command-processing-help
   "Test the help command"
   (let ((world (apeiron.persistence:world-restore-or-initialize)))
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-add-character! world player)
       (apeiron.core:process-command world player "help")
       (is (not (null player))))))
@@ -22,7 +24,8 @@
 (test command-processing-exits
   "Test the exits command"
   (let ((world (apeiron.persistence:world-restore-or-initialize)))
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-add-character! world player)
       (apeiron.core:process-command world player "exits")
       (is (not (null player))))))
@@ -30,7 +33,8 @@
 (test command-processing-inventory
   "Test the inventory command"
   (let ((world (apeiron.persistence:world-restore-or-initialize)))
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-add-character! world player)
       (apeiron.core:process-command world player "inventory")
       (is (not (null player))))))
@@ -38,7 +42,8 @@
 (test command-processing-go
   "Test the go command"
   (let ((world (apeiron.persistence:world-restore-or-initialize)))
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-add-character! world player)
       (let ((start-room (apeiron.core:object-location player)))
         ;; Try to go north (should work from starting room)
@@ -49,7 +54,8 @@
 (test command-processing-unknown
   "Test unknown command handling"
   (let ((world (apeiron.persistence:world-restore-or-initialize)))
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-add-character! world player)
       ;; Unknown command should not crash
       (apeiron.core:process-command world player "blahblah")
@@ -58,7 +64,8 @@
 (test command-processing-eval
   "Test the eval command"
   (let ((world (apeiron.persistence:world-restore-or-initialize)))
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil)))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream))))
           (captured-messages '()))
       (apeiron.core:world-add-character! world player)
       (let ((original-send-message (fdefinition 'apeiron.core:player-send-message)))

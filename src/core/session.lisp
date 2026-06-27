@@ -11,11 +11,11 @@
 ;; On timeout, should send :timeout on second return value
 (defgeneric mud-read-line (obj &key timeout))
 (defgeneric mud-write (obj message &key newline))
-(defgeneric session-stream (session)
-  (:documentation "Return the stream backing this session, or nil."))
 (defgeneric session-keepalive (session)
   (:documentation "Send a keepalive heartbeat for this session.
 The default method is a no-op."))
+(defgeneric session-disconnect (session)
+  (:documentation "Clean up and disconnect this session."))
 
 ;;
 ;; MUD Session basic implementation of protocols
@@ -25,19 +25,17 @@ The default method is a no-op."))
   ((id :initarg :id
        :accessor session-id
        :documentation "Unique identifier for this object")
-   (socket :initarg :socket
-           :accessor session-socket
-           :documentation "Network socket for this session")
    (character :initarg :player
               :accessor session-character
               :initform nil
               :documentation "Player controlled by this session"))
   (:documentation "A network session in the MUD"))
 
-(defun new-session (socket)
+(defun new-session ()
+  "Create a new base mud-session with no backing I/O.
+Subclasses with I/O should be used instead (e.g. STREAM-SESSION)."
   (make-instance 'mud-session
-                                  :id (make-id)
-                          :socket socket))
+                 :id (make-id)))
 
 (defmethod session-keepalive ((session mud-session))
   "Default keepalive is a no-op.  Subclasses (e.g. telnet-session)
@@ -45,37 +43,12 @@ should override this to send protocol-specific heartbeats."
   (declare (ignore session))
   nil)
 
-(defmethod session-stream ((session mud-session))
-  "Base implementation returns nil.  Subclasses backed by a
-stream should override this method."
-  (declare (ignore session))
-  nil)
-
-(defgeneric session-disconnect (session)
-  (:documentation "Clean up and disconnect this session."))
-
 (defmethod session-disconnect ((session mud-session))
   "Disconnect the session — only clears the character link.
 Subclasses should close their own resources first and then
 call CALL-NEXT-METHOD to clear the character link."
   (when (session-character session)
     (setf (session-character session) nil)))
-
-(defmethod mud-write ((obj mud-session) message &key (newline t))
-  (let ((stream (session-stream obj)))
-    (when stream
-      (handler-case
-          (progn
-            (if newline
-                (format stream "~A~%" message)
-                (format stream "~A" message))
-            (force-output stream))
-        (error (e)
-          (let ((error-str (format nil "~A" e)))
-            (unless (or (search "Broken pipe" error-str)
-                        (search "closed" error-str))
-              (log-error "Failed to send message to session ~A: ~A"
-                         (session-socket obj) e))))))))
 
 (defun session-send-prompt (session)
   "Send a prompt to a player on the same line (no newline)."
@@ -143,6 +116,22 @@ that provide their own stream abstraction."))
                   (values nil :eof)))
           (error (e)
             (values nil e))))))
+
+(defmethod mud-write ((obj stream-session) message &key (newline t))
+  (let ((stream (session-stream obj)))
+    (when stream
+      (handler-case
+          (progn
+            (if newline
+                (format stream "~A~%" message)
+                (format stream "~A" message))
+            (force-output stream))
+        (error (e)
+          (let ((error-str (format nil "~A" e)))
+            (unless (or (search "Broken pipe" error-str)
+                        (search "closed" error-str))
+              (log-error "Failed to send message to session ~D: ~A"
+                         (session-id obj) e))))))))
 
 (defmethod session-disconnect ((session stream-session))
   (when (session-stream session)

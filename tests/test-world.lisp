@@ -65,7 +65,8 @@
   "Test adding a character places them in the world's starting room"
   (let ((world (apeiron.core:new-world))
         (room (apeiron.core:new-room :name "Spawn"))
-        (player (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:mud-session :socket nil))))
+        (player (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
     (apeiron.core:world-set-object-id! world room)
     (apeiron.core:world-set-starting-room! world room)
     (apeiron.core:world-set-object-id! world player)
@@ -80,8 +81,10 @@
     (apeiron.core:world-set-object-id! world room)
     (apeiron.core:world-set-starting-room! world room)
     (is (= 0 (apeiron.core:world-total-players world)))
-    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:mud-session :socket nil)))
-          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream))))
+          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-set-object-id! world alice)
       (apeiron.core:world-add-character! world alice)
       (is (= 1 (apeiron.core:world-total-players world)))
@@ -95,7 +98,8 @@
         (room (apeiron.core:new-room :name "Spawn")))
     (apeiron.core:world-set-object-id! world room)
     (apeiron.core:world-set-starting-room! world room)
-    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-set-object-id! world player)
       (apeiron.core:world-add-character! world player)
       (is (= 1 (apeiron.core:world-total-players world)))
@@ -115,8 +119,10 @@
     (apeiron.core:world-set-object-id! world room)
     (apeiron.core:world-set-starting-room! world room)
     (is (null (apeiron.core:characters world)))
-    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:mud-session :socket nil)))
-          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream))))
+          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (apeiron.core:world-set-object-id! world alice)
       (apeiron.core:world-add-character! world alice)
       (apeiron.core:world-set-object-id! world bob)
@@ -129,8 +135,10 @@
 (test find-character-in-room
   "Test finding a character in a room by name (case-insensitive)"
   (let ((room (apeiron.core:new-room :name "Tavern"))
-        (alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:mud-session :socket nil)))
-        (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:mud-session :socket nil))))
+        (alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream))))
+        (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
     (setf (apeiron.core:object-location alice) room)
     (setf (apeiron.core:object-location bob) room)
     (apeiron.core:room-add-object room alice)
@@ -150,8 +158,10 @@
         (msgs-b (make-array 0 :adjustable t :fill-pointer t)))
     (apeiron.core:world-set-object-id! world room)
     (apeiron.core:world-set-starting-room! world room)
-    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:mud-session :socket nil)))
-          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream))))
+          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       ;; Capture messages addressed to each player's session via :after method
       (defmethod apeiron.core:mud-write :after ((session (eql (apeiron.core:character-session alice))) msg &key newline)
         (declare (ignore newline))
@@ -177,8 +187,10 @@
         (msgs-b (make-array 0 :adjustable t :fill-pointer t)))
     (apeiron.core:world-set-object-id! world room)
     (apeiron.core:world-set-starting-room! world room)
-    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:mud-session :socket nil)))
-          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:mud-session :socket nil))))
+    (let ((alice (apeiron.core:new-character "Alice" (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream))))
+          (bob   (apeiron.core:new-character "Bob"   (make-instance 'apeiron.core:stream-session
+                                     :stream (make-string-output-stream)))))
       (defmethod apeiron.core:mud-write :after ((session (eql (apeiron.core:character-session alice))) msg &key newline)
         (declare (ignore newline))
         (vector-push-extend msg msgs-a))

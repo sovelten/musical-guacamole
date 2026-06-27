@@ -6,8 +6,10 @@
   "Test that socket errors are handled gracefully"
   (handler-case
       (progn
-        (let ((session (make-instance 'apeiron.core:mud-session :socket nil))
-              (player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:mud-session :socket nil))))
+        (let ((session (make-instance 'apeiron.core:stream-session
+                                      :stream (make-string-output-stream)))
+              (player (apeiron.core:new-character "TestPlayer" (make-instance 'apeiron.core:stream-session
+                                                                              :stream (make-string-output-stream)))))
           ;; Sending message to player with nil socket should not crash
           (apeiron.core:player-send-message player "Test message")
           (is (not (null player)))))
@@ -41,13 +43,13 @@
              (port (usocket:get-local-port server-socket))
              (client-socket (usocket:socket-connect "127.0.0.1" port))
              (accepted-socket (usocket:socket-accept server-socket))
-             (session (make-instance 'apeiron.core:mud-session :socket accepted-socket)))
+             (session (make-instance 'apeiron.core:stream-session
+                                     :stream (usocket:socket-stream accepted-socket))))
         (unwind-protect
              (progn
                (apeiron.persistence:world-restore-or-initialize)
                (let ((player (apeiron.core:new-character "TestPlayer" session)))
                  (is (not (null player)))
-                 ;; Test that we can send a message without crashing
                  (apeiron.core:player-send-message player "Test message")
                  (is (not (null player)))))
           (when client-socket (usocket:socket-close client-socket))
