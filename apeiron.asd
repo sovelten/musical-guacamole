@@ -18,10 +18,8 @@
   :description "Core game logic for the Apeiron MUD — world, characters, and their dependencies."
   :author "Sophia Velten"
   :license "MIT"
-  :depends-on ("usocket"
-               "bordeaux-threads"
-               "flexi-streams"
-               "str"
+  :depends-on ("bordeaux-threads"
+               "usocket"
                "cl-csv")
   :components ((:module "src/core"
                 :components

@@ -13,8 +13,7 @@
         #:apeiron.core.utils
         #:usocket
         #:bordeaux-threads
-        #:cl-csv
-        #:str)
+        #:cl-csv)
   (:export
    ;; Core version / debug
    #:*mud-version*
