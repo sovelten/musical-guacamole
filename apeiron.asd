@@ -33,6 +33,7 @@
                  (:file "guestbook" :depends-on ("object"))
                  (:file "session" :depends-on ("utils"))
                  (:file "character" :depends-on ("object" "session"))
+                 (:file "command-handler" :depends-on ("session"))
                  (:file "world" :depends-on ("room" "guestbook" "character"))))))
 
 (defsystem "apeiron-telnet"
@@ -77,8 +78,8 @@
                "bordeaux-threads")
   :components ((:module "src/server"
                 :components
-                ((:file "session-telnet")
-                 (:file "command-handler" :depends-on ("session-telnet"))
+                ((:file "package")
+                 (:file "session-telnet")
                  (:file "network" :depends-on ("command-handler"))))))
 
 ;; Convenience meta-system — loads everything

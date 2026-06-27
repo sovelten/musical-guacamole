@@ -1,4 +1,4 @@
-(in-package #:mud.utils)
+(in-package #:apeiron.core.utils)
 
 (defvar *id-counter* 0)
 (defvar *id-lock* (bordeaux-threads:make-lock "id-lock"))

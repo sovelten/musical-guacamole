@@ -1,4 +1,4 @@
-(in-package #:mud)
+(in-package #:apeiron.server)
 
 (defvar *server-running* nil)
 (defvar *server-socket* nil)

@@ -1,4 +1,4 @@
-(in-package #:mud)
+(in-package #:apeiron.core)
 
 ;; Room class - a specialized mud-object
 

@@ -1,4 +1,4 @@
-(defpackage #:mud
+(defpackage #:apeiron.core
   (:use #:cl)
   (:export
    ;; Core exports
@@ -98,7 +98,7 @@
    #:*server-ssl-password*
    #:*server-tls-prefer-start-tls*))
 
-(defpackage #:mud.utils
+(defpackage #:apeiron.core.utils
   (:use #:cl)
   (:export
    #:make-id

@@ -7,7 +7,7 @@
 ;;;; This file belongs in the server module because it depends on both
 ;;;; the telnet package and the core mud package, wiring the two together.
 
-(in-package :mud)
+(in-package :apeiron.server)
 
 ;;
 ;; Implementation of mud-session using the telnet server module

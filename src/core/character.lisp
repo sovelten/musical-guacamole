@@ -1,4 +1,4 @@
-(in-package #:mud)
+(in-package #:apeiron.core)
 
 ;; TODO: split character and player-character for building NPCs
 

@@ -1,4 +1,4 @@
-(in-package #:mud)
+(in-package #:apeiron.core)
 
 (defclass mud-object ()
   ((id :initarg :id
