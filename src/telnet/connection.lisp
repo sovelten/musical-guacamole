@@ -156,6 +156,21 @@ full-duplex socket case where the same stream is read and written)."
       (telnet-conn-raw-stream conn)))
 
 ;;; ----------------------------------------------------------------
+;;; Internal: Best-effort echo write (does not abort the read loop)
+;;; ----------------------------------------------------------------
+
+(defun %write-echo (conn bytes)
+  "Write BYTES to CONN's output stream for echo purposes.
+Unlike TELNET-WRITE-RAW, errors are silently swallowed and the connection's
+alive-p flag is NOT touched — echo failures must never abort the read loop."
+  (handler-case
+      (bordeaux-threads:with-lock-held ((telnet-conn-lock conn))
+        (let ((out (telnet-conn-out-stream conn)))
+          (write-sequence bytes out)
+          (force-output out)))
+    (error () nil)))
+
+;;; ----------------------------------------------------------------
 ;;; Construction
 ;;; ----------------------------------------------------------------
 
@@ -505,7 +520,15 @@ Returns (values nil :connection-lost) on fatal error."
                      (return-from telnet-read-char (values nil :eof)))
                    (%handle-telnet-command conn cmd opt)))
 
-                ;; Other 2-byte commands
+                ;; IAC EC (0xF7) — erase character: signal to caller
+                ((= cmd ec)
+                 (return-from telnet-read-char (values nil :erase-char)))
+
+                ;; IAC EL (0xF8) — erase line: signal to caller
+                ((= cmd el)
+                 (return-from telnet-read-char (values nil :erase-line)))
+
+                ;; Other 2-byte commands — consume silently
                 (t
                  (%handle-telnet-command conn cmd 0))))
 
@@ -526,11 +549,15 @@ Returns (values nil :connection-lost) on fatal error."
 ;;; Public: Read a line of text
 ;;; ----------------------------------------------------------------
 
-(defun telnet-read-line (conn &key (timeout 300) (poll-interval 0.1))
+(defun telnet-read-line (conn &key (timeout 300) (poll-interval 0.1) (echo t))
   "Read a line of text from the telnet connection.
 
 TIMEOUT is the total maximum time to wait in seconds.
 POLL-INTERVAL is the granularity of polling in seconds.
+ECHO controls server-echo mode (default T).  When T the server echoes
+printable characters back to the client and sends BS SP BS (08 20 08)
+sequences for erase operations.  Set to NIL for silent input (e.g.
+password prompts).
 
 Returns (values line nil) on success, where LINE is a string
 without the trailing newline.
@@ -549,41 +576,94 @@ this function has already consumed, looping forever until timeout."
                              :adjustable t :fill-pointer 0))
          (nul (code-char 0))
          (saw-cr nil))
-    (loop
-      (let ((remaining (- deadline (get-internal-real-time))))
-        (when (<= remaining 0)
-          (return (values nil :timeout)))
+    (flet ((%erase-char ()
+             ;; Remove the last character from the accumulation buffer.
+             ;; Also clears any pending saw-cr state (user pressed BS after CR).
+             ;; When ECHO: send BS SP BS to visually erase on the terminal.
+             ;; When buffer is empty: optionally ring BEL (07) so the user
+             ;; knows they cannot backspace past the prompt.
+             (setf saw-cr nil)          ; cancel any pending CR state
+             (if (> (fill-pointer acc) 0)
+                 (progn
+                   (decf (fill-pointer acc))
+                   (when echo (%write-echo conn #(8 32 8)))) ; BS SP BS
+                 (when echo (%write-echo conn #(7)))))        ; BEL — at prompt
+           (%erase-line ()
+             ;; Clear the entire accumulation buffer.
+             ;; When ECHO: send one BS SP BS per buffered character to
+             ;; visually erase the whole line.
+             (let ((n (fill-pointer acc)))
+               (setf (fill-pointer acc) 0
+                     saw-cr nil)
+               (when echo
+                 (dotimes (i n)
+                   (%write-echo conn #(8 32 8)))))))  ; BS SP BS × n
+      (loop
+        (let ((remaining (- deadline (get-internal-real-time))))
+          (when (<= remaining 0)
+            (return (values nil :timeout)))
 
-        (multiple-value-bind (char status)
-            (telnet-read-char conn
-                              :timeout (min poll-interval
-                                            (/ remaining
-                                               internal-time-units-per-second)))
-          (cond
-            ((and (null char) (eq status :timeout)) nil)
+          (multiple-value-bind (char status)
+              (telnet-read-char conn
+                                :timeout (min poll-interval
+                                              (/ remaining
+                                                 internal-time-units-per-second)))
+            (cond
+              ;; No data yet — continue polling
+              ((and (null char) (eq status :timeout)) nil)
 
-            ((and (null char) (or (eq status :eof) (eq status :connection-lost)))
-             (return (values nil status)))
+              ;; Connection ended
+              ((and (null char) (or (eq status :eof) (eq status :connection-lost)))
+               (return (values nil status)))
 
-            ((char= char #\Return)
-             (setf saw-cr t))
+              ;; IAC EC — erase one character
+              ((and (null char) (eq status :erase-char))
+               (%erase-char))
 
-            ((and saw-cr (char= char #\Newline))
-             (return (values (coerce acc 'string) nil)))
+              ;; IAC EL — erase entire line
+              ((and (null char) (eq status :erase-line))
+               (%erase-line))
 
-            ((and saw-cr (char= char nul))
-             (return (values (coerce acc 'string) nil)))
+              ;; BS (08) or DEL (7F) — erase one character
+              ((and char (or (= (char-code char) 8) (= (char-code char) 127)))
+               (%erase-char))
 
-            ((char= char #\Newline)
-             (return (values (coerce acc 'string) nil)))
+              ;; CR — start of NVT end-of-line sequence; wait for LF or NUL
+              ((char= char #\Return)
+               (setf saw-cr t))
 
-            (saw-cr
-             (setf saw-cr nil)
-             (vector-push-extend #\Return acc)
-             (vector-push-extend char acc))
+              ;; CR LF — NVT end of line; echo CR LF and deliver the line
+              ((and saw-cr (char= char #\Newline))
+               (when echo (%write-echo conn #(13 10)))  ; echo CR LF
+               (return (values (coerce acc 'string) nil)))
 
-            (t
-             (vector-push-extend char acc))))))))
+              ;; CR NUL — NVT end of line (RFC 854 alternative); echo CR LF
+              ((and saw-cr (char= char nul))
+               (when echo (%write-echo conn #(13 10)))  ; echo CR LF
+               (return (values (coerce acc 'string) nil)))
+
+              ;; Bare LF — treat as line terminator (robustness)
+              ((char= char #\Newline)
+               (when echo (%write-echo conn #(13 10)))  ; echo CR LF
+               (return (values (coerce acc 'string) nil)))
+
+              ;; CR followed by some other character (unusual)
+              (saw-cr
+               (setf saw-cr nil)
+               (vector-push-extend #\Return acc)
+               (vector-push-extend char acc))
+
+              ;; Control characters other than BS/DEL — ignore silently
+              ((< (char-code char) 32) nil)
+
+              ;; Printable character: accumulate and echo
+              (t
+               (vector-push-extend char acc)
+               (when echo
+                 ;; IAC-escape the UTF-8 bytes before sending
+                 (let ((bytes (flexi-streams:string-to-octets
+                               (string char) :external-format :utf-8)))
+                   (%write-echo conn (iac-escape bytes))))))))))))
 
 ;;; ----------------------------------------------------------------
 ;;; Public: Write a string

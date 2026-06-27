@@ -24,7 +24,18 @@
                telnet-terminal-type-subnegotiation
                telnet-iac-escape-doubles-iac
                telnet-read-char-eof
-               telnet-write-read-roundtrip)))
+               telnet-write-read-roundtrip
+               ;; Backspace / erase handling
+               telnet-read-line-bs-erases-char
+               telnet-read-line-del-erases-char
+               telnet-read-line-bs-at-empty-buffer
+               telnet-read-line-iac-ec-erases-char
+               telnet-read-line-iac-el-erases-line
+               telnet-read-line-multiple-bs
+               ;; Negotiation
+               telnet-init-negotiation-includes-will-echo
+               telnet-do-after-will-no-loop
+               telnet-dont-after-will-clears-pending)))
   (dolist (test tests)
     (format t "~%=== ~S ===~%" test)
     (handler-case

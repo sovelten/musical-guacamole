@@ -459,6 +459,167 @@ to WRITE-STREAM."
       (let ((raw (telnet::telnet-conn-raw-stream conn)))
         (when raw (ignore-errors (close raw :abort t)))))))
 
+;; ---------------------------------------------------------------
+;; Tests: Backspace / erase handling in telnet-read-line
+;; ---------------------------------------------------------------
+
+(test telnet-read-line-bs-erases-char
+  "BS (0x08) should erase the last character in the line buffer."
+  ;; Send "helo" + BS + "lo" + CR LF → expect "hello"
+  ;; h=104 e=101 l=108 o=111  BS=8  l=108 o=111  CR=13 LF=10
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           (write-bytes write-stream #(104 101 108 111 8 108 111 13 10))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2 :echo nil)
+             (is (string= line "hello"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+(test telnet-read-line-del-erases-char
+  "DEL (0x7F) should erase the last character in the line buffer."
+  ;; Send "helo" + DEL + "lo" + CR LF → expect "hello"
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           (write-bytes write-stream #(104 101 108 111 127 108 111 13 10))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2 :echo nil)
+             (is (string= line "hello"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+(test telnet-read-line-bs-at-empty-buffer
+  "BS at an empty buffer should not erase past the start (no crash, no char added)."
+  ;; Send BS BS "hi" + CR LF → expect "hi" (the BSes are at empty buffer)
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           (write-bytes write-stream #(8 8 104 105 13 10))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2 :echo nil)
+             (is (string= line "hi"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+(test telnet-read-line-iac-ec-erases-char
+  "IAC EC (FF F7) should erase the last character in the line buffer."
+  ;; Send "helo" + IAC EC + "lo" + CR LF → expect "hello"
+  ;; EC = 247 = 0xF7
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           (write-bytes write-stream #(104 101 108 111 255 247 108 111 13 10))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2 :echo nil)
+             (is (string= line "hello"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+(test telnet-read-line-iac-el-erases-line
+  "IAC EL (FF F8) should erase the entire line buffer."
+  ;; Send "garbage" + IAC EL + "hello" + CR LF → expect "hello"
+  ;; EL = 248 = 0xF8
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           (write-bytes write-stream
+                        (concatenate '(vector (unsigned-byte 8))
+                                     (map '(vector (unsigned-byte 8)) #'char-code "garbage")
+                                     #(255 248)        ; IAC EL
+                                     (map '(vector (unsigned-byte 8)) #'char-code "hello")
+                                     #(13 10)))        ; CR LF
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2 :echo nil)
+             (is (string= line "hello"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+(test telnet-read-line-multiple-bs
+  "Multiple BS characters should erase multiple characters."
+  ;; Send "hello!!" + BS BS + CR LF → expect "hello"
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           (write-bytes write-stream #(104 101 108 108 111 33 33 8 8 13 10))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2 :echo nil)
+             (is (string= line "hello"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+;; ---------------------------------------------------------------
+;; Test: telnet-init-negotiation includes WILL ECHO
+;; ---------------------------------------------------------------
+
+(test telnet-init-negotiation-includes-will-echo
+  "telnet-init-negotiation should include WILL ECHO (IAC WILL 01) in the
+initial command list to enable server-echo / character-at-a-time mode."
+  (let* ((protocol (make-instance 'telnet:telnet-protocol))
+         (cmds (telnet:telnet-init-negotiation protocol))
+         (found-will-echo nil))
+    (dolist (cmd cmds)
+      ;; Look for IAC WILL 01 = #(255 251 1)
+      (when (and (= (length cmd) 3)
+                 (= (aref cmd 0) 255)  ; IAC
+                 (= (aref cmd 1) 251)  ; WILL
+                 (= (aref cmd 2) 1))   ; ECHO option
+        (setf found-will-echo t)))
+    (is-true found-will-echo
+             "Init negotiation should include WILL ECHO")))
+
+;; ---------------------------------------------------------------
+;; Test: negotiation loop prevention (DO after our WILL should not re-send WILL)
+;; ---------------------------------------------------------------
+
+(test telnet-do-after-will-no-loop
+  "Receiving DO ECHO after we sent WILL ECHO should enable the option but
+NOT send another WILL (which would cause a negotiation loop)."
+  (let* ((protocol (make-instance 'telnet:telnet-protocol)))
+    ;; Simulate having already sent WILL ECHO (pending=t, wanted=t)
+    (telnet:telnet-init-negotiation protocol)
+    ;; Now receive DO ECHO from client (confirming our offer)
+    (let ((responses (telnet:telnet-process-command
+                      protocol
+                      telnet::do
+                      telnet:+telnet-opt-echo+)))
+      (is (null responses)
+          "DO ECHO confirming our pending WILL should produce no response")
+      ;; Option should now be enabled
+      (let ((state (telnet:telnet-local-option protocol telnet:+telnet-opt-echo+)))
+        (is-true (telnet::telnet-option-state-enabled state)
+                 "ECHO option should be enabled after DO confirmation")))))
+
+;; ---------------------------------------------------------------
+;; Test: DONT response to our WILL clears pending state gracefully
+;; ---------------------------------------------------------------
+
+(test telnet-dont-after-will-clears-pending
+  "Receiving DONT ECHO after we sent WILL ECHO should clear pending state
+without sending WONT (graceful degradation — no negotiation loop)."
+  (let* ((protocol (make-instance 'telnet:telnet-protocol)))
+    (telnet:telnet-init-negotiation protocol)
+    ;; Receive DONT ECHO from client (client refuses server-echo)
+    (let ((responses (telnet:telnet-process-command
+                      protocol
+                      telnet::dont
+                      telnet:+telnet-opt-echo+)))
+      (is (null responses)
+          "DONT ECHO refusing our pending WILL should produce no response")
+      ;; Option should remain disabled, pending should be cleared
+      (let ((state (telnet:telnet-local-option protocol telnet:+telnet-opt-echo+)))
+        (is (null (telnet::telnet-option-state-enabled state))
+            "ECHO option should not be enabled after DONT refusal")
+        (is (null (telnet::telnet-option-state-pending state))
+            "Pending flag should be cleared after DONT refusal")))))
+
 ;; ===============================================================
 ;; TLS Support Tests
 ;; ===============================================================

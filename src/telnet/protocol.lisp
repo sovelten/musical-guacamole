@@ -220,55 +220,73 @@ Implementation follows the RFC 854 symmetric negotiation model:
   (declare (ignore p command option))
   nil)
 
-;; DO — Remote asks us to perform OPTION
+;; DO — Remote confirms our WILL offer, or asks us to start performing OPTION
 (defmethod telnet-process-command ((p telnet-protocol) (command (eql telnet::do)) option)
   (let ((state (ensure-option-state p :local option)))
     (cond
       ;; Already enabled — no response needed (prevents negotiation loops)
       ((telnet-option-state-enabled state)
        nil)
-      ;; Wanted but not yet enabled — enable and confirm
+      ;; Wanted but not yet enabled
       ((telnet-option-state-wanted state)
-       (setf (telnet-option-state-enabled state) t
-             (telnet-option-state-pending state) nil)
-       (list (make-command-2 telnet::will option)))
+       (let ((we-initiated (telnet-option-state-pending state)))
+         (setf (telnet-option-state-enabled state) t
+               (telnet-option-state-pending state) nil)
+         ;; If we sent WILL first (pending), the DO is just confirmation —
+         ;; do NOT echo back WILL to avoid a negotiation loop.
+         (unless we-initiated
+           (list (make-command-2 telnet::will option)))))
       ;; Not wanted
       (t
        (list (make-command-2 telnet::wont option))))))
 
-;; DONT — Remote asks us to stop performing OPTION
+;; DONT — Remote refuses our WILL offer, or asks us to stop performing OPTION
 (defmethod telnet-process-command ((p telnet-protocol) (command (eql telnet::dont)) option)
   (let ((state (ensure-option-state p :local option)))
-    ;; Only respond if there's a state change to confirm
-    (when (telnet-option-state-enabled state)
-      (setf (telnet-option-state-enabled state) nil
-            (telnet-option-state-pending state) nil)
-      (list (make-command-2 telnet::wont option)))))
+    (cond
+      ;; Currently enabled — state change: disable and confirm with WONT
+      ((telnet-option-state-enabled state)
+       (setf (telnet-option-state-enabled state) nil
+             (telnet-option-state-pending state) nil)
+       (list (make-command-2 telnet::wont option)))
+      ;; We offered (pending) but client refused — clear pending, no response
+      ((telnet-option-state-pending state)
+       (setf (telnet-option-state-pending state) nil)
+       nil))))
 
-;; WILL — Remote offers to perform OPTION
+;; WILL — Remote confirms our DO offer, or offers to start performing OPTION
 (defmethod telnet-process-command ((p telnet-protocol) (command (eql telnet::will)) option)
   (let ((state (ensure-option-state p :remote option)))
     (cond
       ;; Already enabled — no response needed (prevents negotiation loops)
       ((telnet-option-state-enabled state)
        nil)
-      ;; Wanted but not yet enabled — enable and confirm
+      ;; Wanted but not yet enabled
       ((telnet-option-state-wanted state)
-       (setf (telnet-option-state-enabled state) t
-             (telnet-option-state-pending state) nil)
-       (list (make-command-2 telnet::do option)))
+       (let ((we-initiated (telnet-option-state-pending state)))
+         (setf (telnet-option-state-enabled state) t
+               (telnet-option-state-pending state) nil)
+         ;; If we sent DO first (pending), the WILL is just confirmation —
+         ;; do NOT echo back DO to avoid a negotiation loop.
+         (unless we-initiated
+           (list (make-command-2 telnet::do option)))))
       ;; Not wanted
       (t
        (list (make-command-2 telnet::dont option))))))
 
-;; WONT — Remote refuses to perform OPTION
+;; WONT — Remote refuses our DO offer, or declines to perform OPTION
 (defmethod telnet-process-command ((p telnet-protocol) (command (eql telnet::wont)) option)
   (let ((state (ensure-option-state p :remote option)))
-    ;; Only respond if there's a state change to confirm
-    (when (telnet-option-state-enabled state)
-      (setf (telnet-option-state-enabled state) nil
-            (telnet-option-state-pending state) nil)
-      (list (make-command-2 telnet::dont option)))))
+    (cond
+      ;; Currently enabled — state change: disable and confirm with DONT
+      ((telnet-option-state-enabled state)
+       (setf (telnet-option-state-enabled state) nil
+             (telnet-option-state-pending state) nil)
+       (list (make-command-2 telnet::dont option)))
+      ;; We asked (pending) but remote refused — clear pending, no response
+      ((telnet-option-state-pending state)
+       (setf (telnet-option-state-pending state) nil)
+       nil))))
 
 ;;; ----------------------------------------------------------------
 ;;; Subnegotiation processing
@@ -330,20 +348,15 @@ calls TELNET-INIT-NEGOTIATION."
 (defun telnet-init-negotiation (protocol)
   "Return the initial set of commands to send when a connection is established.
 
-The MUD operates in LINE MODE with CLIENT-SIDE (local) echo: the client
-collects a whole line, echoing each keystroke locally, and sends it to us
-on Enter; we read complete lines with TELNET-READ-LINE.
+The MUD operates in CHARACTER-AT-A-TIME mode (a.k.a. server-echo / kludge
+line mode): the server receives every keystroke individually and is fully
+responsible for echoing, line editing, and erase handling.
 
-Critically we do NOT offer WILL ECHO.  WILL ECHO tells the client \"the
-server will echo your input for you\", which makes typical telnet clients
-turn OFF local echo AND switch into character-at-a-time mode.  Since a
-line-based server does not echo individual keystrokes, the user would see
-nothing they type.  Leaving ECHO alone keeps the client in its default
-line mode with local echo, which is what we want.
-
-We request:
+We send:
+  - WILL ECHO               (server will echo each keystroke; client turns
+                             off local echo and sends chars one at a time)
+  - WILL Suppress Go Ahead  (we never send GA ourselves; full-duplex)
   - DO Suppress Go Ahead    (full-duplex; we never wait for the client's GA)
-  - WILL Suppress Go Ahead  (we never send GA ourselves)
   - DO NAWS                 (we want to know window dimensions)
   - DO Terminal Type        (we want to know the terminal type)
 
@@ -351,8 +364,11 @@ The commands are a list of byte-vectors ready to be written to the socket."
   ;; Built-in subnegotiation handlers (NAWS, TERMINAL-TYPE) are registered
   ;; automatically by INITIALIZE-INSTANCE on the protocol object.
 
-  ;; Local: we WILL suppress go-ahead.  (We deliberately do NOT want ECHO.)
-  (let ((local-sga (ensure-option-state protocol :local +telnet-opt-suppress-go-ahead+)))
+  ;; Local: we WILL echo AND WILL suppress go-ahead.
+  (let ((local-echo (ensure-option-state protocol :local +telnet-opt-echo+))
+        (local-sga  (ensure-option-state protocol :local +telnet-opt-suppress-go-ahead+)))
+    (setf (telnet-option-state-wanted local-echo) t
+          (telnet-option-state-pending local-echo) t)
     (setf (telnet-option-state-wanted local-sga) t
           (telnet-option-state-pending local-sga) t))
 
@@ -368,10 +384,11 @@ The commands are a list of byte-vectors ready to be written to the socket."
           (telnet-option-state-pending remote-term) t))
 
   ;; Build initial command list
-  (let ((commands (list (make-command-2 do +telnet-opt-suppress-go-ahead+)
+  (let ((commands (list (make-command-2 will +telnet-opt-echo+)
                         (make-command-2 will +telnet-opt-suppress-go-ahead+)
-                        (make-command-2 do +telnet-opt-naws+)
-                        (make-command-2 do +telnet-opt-terminal-type+))))
+                        (make-command-2 do  +telnet-opt-suppress-go-ahead+)
+                        (make-command-2 do  +telnet-opt-naws+)
+                        (make-command-2 do  +telnet-opt-terminal-type+))))
     ;; If START_TLS is wanted (registered via telnet-register-start-tls),
     ;; include WILL START_TLS in the initial negotiation.
     (let ((start-tls-state (gethash +telnet-opt-start-tls+
