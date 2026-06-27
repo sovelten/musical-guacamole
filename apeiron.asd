@@ -28,6 +28,8 @@
                  (:file "object" :depends-on ("utils"))
                  (:file "room" :depends-on ("object"))
                  (:file "guestbook" :depends-on ("object"))
+                 (:file "npc" :depends-on ("object"))
+                 (:file "combat" :depends-on ("npc" "character"))
                  (:file "session" :depends-on ("utils"))
                  (:file "character" :depends-on ("object" "session"))
                  (:file "command-handler" :depends-on ("session"))
@@ -62,7 +64,8 @@
                 :components
                 ((:file "package")
                  (:file "store")
-                 (:file "persistent-world" :depends-on ("store"))))))
+                 (:file "persistent-world" :depends-on ("store"))
+                 (:file "world-areas" :depends-on ("persistent-world"))))))
 
 (defsystem "apeiron-server"
   :version "0.0.1"

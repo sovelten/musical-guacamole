@@ -1,4 +1,6 @@
 (push #p"./" asdf:*central-registry*)
+
+(asdf:load-asd #P"./apeiron.asd")
 (ql:quickload :apeiron)
 
 ;; Check command-line options to force a new world
@@ -8,11 +10,11 @@
   (let ((cert-path (merge-pathnames "cert.pem" (uiop:getcwd)))
         (key-path (merge-pathnames "key.pem" (uiop:getcwd))))
     (when (and (probe-file cert-path) (probe-file key-path))
-      (setf mud:*server-ssl-certificate* (namestring cert-path)
-            mud:*server-ssl-key* (namestring key-path))
+      (setf apeiron.server:*server-ssl-certificate* (namestring cert-path)
+            apeiron.server:*server-ssl-key* (namestring key-path))
       (format t "~&TLS cert found: ~A~%" cert-path)))
-  (mud:start-mud-server :force-new force-new))
+  (apeiron.server:start-mud-server :force-new force-new))
 
 ;; Keep the main thread alive while server is running
-(loop while mud:*server-running*
+(loop while apeiron.server:*server-running*
       do (sleep 1))

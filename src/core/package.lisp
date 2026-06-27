@@ -41,6 +41,21 @@
    #:object-set-property
    #:object-move
 
+   ;; NPC / Combat
+   #:mud-npc
+   #:new-npc
+   #:new-persistent-npc
+   #:npc-defeated-p
+   #:find-npc-in-room
+   #:combat-attack-npc
+   #:room-challenge-blocked-p
+   #:room-exit-blocked-p
+   #:player-hp
+   #:player-max-hp
+   #:player-ensure-combat-stats
+   #:build-shopping-mall
+   #:build-team-rocket-cavern
+
    ;; Room system
    #:mud-room
    #:new-room
