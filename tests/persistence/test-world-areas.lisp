@@ -54,6 +54,27 @@
     (is (apeiron.core:npc-defeated-p grunt))
     (is (apeiron.core:object-get-property player "beat-grunt-1"))))
 
+(test player-defeated-respawns-at-cavern-mouth
+  "When a player is knocked out by an NPC, they respawn at the cavern mouth
+   without error — regression test: world-rooms returns a hash-table, not a list."
+  (let* ((world (apeiron.persistence:world-restore-or-initialize :force-new t))
+         (player (apeiron.core:new-character "Fighter" (make-instance 'apeiron.core:stream-session
+                                                                       :stream (make-string-output-stream))))
+         (grunt-room (find-if (lambda (r) (string= "Grunt Patrol Route" (apeiron.core:object-name r)))
+                              (apeiron.persistence:rooms)))
+         (grunt (find-if (lambda (obj) (typep obj 'apeiron.core:mud-npc))
+                          (apeiron.core:room-contents grunt-room))))
+    ;; Put the player in the grunt room
+    (apeiron.core:object-move player grunt-room)
+    ;; Crank the player's HP down so the very first counter-attack KOs them
+    (setf (apeiron.core:player-hp player) 1)
+    ;; This call triggers the respawn code path (player-defeated-p → world-rooms)
+    ;; It should not signal a type-error
+    (is (listp (apeiron.core:combat-attack-npc world player grunt)))
+    ;; After defeat, player should be healed and not in the grunt room
+    (is (> (apeiron.core:player-hp player) 0))
+    (is (not (eq (apeiron.core:object-location player) grunt-room)))))
+
 (test challenge-answer-riddle
   "Answering a riddle unlocks the challenge flag."
   (let* ((world (apeiron.persistence:world-restore-or-initialize :force-new t))

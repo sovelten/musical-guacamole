@@ -60,9 +60,9 @@
               (push "You black out and wake up at the cavern entrance, bruised but alive."
                     messages)
               (player-heal-full player)
-              (let ((entrance (find-if (lambda (r)
-                                         (search "Cavern Mouth" (object-name r)))
-                                       (world-rooms world))))
+              (let ((entrance (loop for r being the hash-values of (world-rooms world)
+                                   when (search "Cavern Mouth" (object-name r))
+                                   return r)))
                 (when entrance
                   (object-move player entrance)))))))
     (nreverse messages)))
