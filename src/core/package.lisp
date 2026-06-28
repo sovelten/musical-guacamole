@@ -37,6 +37,7 @@
    #:object-describe
    #:object-location
    #:object-properties
+   #:object-type
    #:object-get-property
    #:object-set-property
    #:object-move
@@ -44,8 +45,16 @@
    ;; NPC / Combat
    #:mud-npc
    #:new-npc
-   #:new-persistent-npc
+   #:npc-hp
+   #:npc-max-hp
+   #:npc-attack-min
+   #:npc-attack-max
    #:npc-defeated-p
+   #:npc-defeat!
+   #:npc-defeat-message
+   #:npc-victory-flag
+   #:npc-roll-attack
+   #:npc-describe
    #:find-npc-in-room
    #:combat-attack-npc
    #:room-challenge-blocked-p
