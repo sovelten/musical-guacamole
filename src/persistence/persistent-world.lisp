@@ -1,3 +1,5 @@
+;;;; src/persistence/persistent-world.lisp — BKNR datastore persistence for the MUD world
+
 (in-package :apeiron.persistence)
 
 ;; ─── Persistent wrapper classes ──────────────────────────────────────────────
@@ -107,45 +109,153 @@ close/reopen cycles that trigger BKNR transaction log replay warnings."
   (bknr.datastore:snapshot)
   t)
 
-;; ─── World persistence ──────────────────────────────────────────────────────
+;; ─── Minimal transient world builder ────────────────────────────────────────
 
-(defun initial-world ()
-  "Create a fresh world with default rooms and guestbook.
-   All persistent objects are created within a single transaction."
-  (let ((world (make-instance 'persistent-world)))
-    (bknr.datastore:with-transaction ("initial-world")
-      (let ((gathering (new-persistent-room :name "The Gathering"
-                                            :description "A warm, circular hall with a high domed ceiling. Torches flicker along the stone walls, casting dancing shadows. Four archways stand at the cardinal points, each bearing a carved symbol: a leaf (north), a sun (east), a droplet (west), and a flame (south). A sturdy oak guestbook sits on a pedestal in the centre."))
-            (forest (new-persistent-room :name "A Whispering Forest"
-                                         :description "Ancient trees tower overhead, their leaves rustling secrets in the wind. Shafts of golden sunlight pierce the canopy, illuminating patches of moss and wildflowers. A faint path winds deeper into the woods."))
-            (desert (new-persistent-room :name "A Sun-Bleached Desert"
-                                         :description "Endless dunes of golden sand stretch to the horizon under a blinding sun. The heat shimmers in waves, and the silence is broken only by the occasional skitter of a unseen creature. The bleached bones of a long-dead beast protrude from a nearby dune."))
-            (swamp (new-persistent-room :name "A Murky Swamp"
-                                        :description "Stagnant water laps at gnarled tree roots as thick mist curls around your ankles. The air is heavy with the smell of decay and damp earth. Somewhere in the distance, a bullfrog croaks and something large splashes."))
-            (volcano (new-persistent-room :name "A Rumbling Volcano"
-                                          :description "The ground trembles beneath your feet. Glowing lava flows through cracks in the black, jagged rock, casting an eerie red glow across the cavern. Heat shimmers violently and the air reeks of sulphur. The mountain groans above you."))
-            (guestbook (new-persistent-guestbook :name "an oak guestbook")))
-        ;; Place the guestbook in The Gathering
-        (room-add-object gathering guestbook)
-        ;; Connect The Gathering (hub) to the four biomes
-        (room-add-exits gathering "north" forest "south")
-        (room-add-exits gathering "east" desert "west")
-        (room-add-exits gathering "west" swamp "east")
-        (room-add-exits gathering "south" volcano "north")
-        ;; Desert door → shopping mall → Team Rocket cavern maze
-        (build-shopping-mall world desert)
-        ;; Register all objects in the world
-        (world-set-object-id! world guestbook)
-        (world-set-object-id! world gathering)
-        (world-set-object-id! world forest)
-        (world-set-object-id! world desert)
-        (world-set-object-id! world swamp)
-        (world-set-object-id! world volcano)
-        (world-set-starting-room! world gathering)))
+(defun default-transient-world ()
+  "Create a bare transient world with the five hub rooms and a guestbook.
+
+This is the fallback used when WORLD-RESTORE-OR-INITIALIZE is called
+without an :INITIALIZER.  The full Apeiron world (with mall, cavern,
+NPCs, etc.) lives in the APEIRON.WORLDS system."
+  (let ((world (make-instance 'mud-world)))
+    (let ((gathering (new-room :name "The Gathering"
+                              :description "A warm, circular hall with a high domed ceiling. Torches flicker along the stone walls, casting dancing shadows."))
+          (forest (new-room :name "A Whispering Forest"
+                            :description "Ancient trees tower overhead, their leaves rustling secrets in the wind."))
+          (desert (new-room :name "A Sun-Bleached Desert"
+                            :description "Endless dunes of golden sand stretch to the horizon under a blinding sun."))
+          (swamp (new-room :name "A Murky Swamp"
+                           :description "Stagnant water laps at gnarled tree roots as thick mist curls around your ankles."))
+          (volcano (new-room :name "A Rumbling Volcano"
+                             :description "The ground trembles beneath your feet. Glowing lava flows through cracks in the black, jagged rock."))
+          (guestbook (new-guestbook :name "an oak guestbook"
+                                    :filepath (namestring (merge-pathnames "guestbook.csv" *data-directory*)))))
+      (room-add-object gathering guestbook)
+      (room-add-exits gathering "north" forest "south")
+      (room-add-exits gathering "east" desert "west")
+      (room-add-exits gathering "west" swamp "east")
+      (room-add-exits gathering "south" volcano "north")
+      (world-set-object-id! world guestbook)
+      (world-set-object-id! world gathering)
+      (world-set-object-id! world forest)
+      (world-set-object-id! world desert)
+      (world-set-object-id! world swamp)
+      (world-set-object-id! world volcano)
+      (world-set-starting-room! world gathering))
     world))
 
-(defun world-restore-or-initialize (&key force-new)
-  "Restore the world from the BKNR datastore, or initialise a new one.
+;; ─── World materialization ──────────────────────────────────────────────────
+
+(defun clone-properties (source target)
+  "Copy all properties from SOURCE to TARGET."
+  (maphash (lambda (k v) (object-set-property target k v))
+           (object-properties source)))
+
+(defun materialize-object (obj persistent-world map)
+  "Create a persistent copy of OBJ, register it in PERSISTENT-WORLD,
+and store the mapping in MAP (transient -> persistent)."
+  (let ((p (etypecase obj
+               (mud-npc
+                (let ((n (make-instance 'persistent-npc
+                           :name (object-name obj)
+                           :description (object-description obj)
+                           :type (object-type obj)
+                           :hp (npc-hp obj)
+                           :max-hp (npc-max-hp obj)
+                           :attack-min (npc-attack-min obj)
+                           :attack-max (npc-attack-max obj)
+                           :defeated (npc-defeated-p obj)
+                           :defeat-message (npc-defeat-message obj)
+                           :victory-flag (npc-victory-flag obj))))
+                  (clone-properties obj n)
+                  n))
+               (mud-guestbook
+                (let ((gb (make-instance 'persistent-guestbook
+                            :name (object-name obj)
+                            :description (object-description obj)
+                            :type (object-type obj)
+                            :filepath (guestbook-filepath obj))))
+                  (clone-properties obj gb)
+                  (setf (guestbook-entries gb)
+                        (copy-list (guestbook-entries obj)))
+                  gb))
+               (mud-room
+                (let ((r (make-instance 'persistent-room
+                           :name (object-name obj)
+                           :description (object-description obj)
+                           :type (object-type obj))))
+                  (clone-properties obj r)
+                  r))
+               (mud-object
+                (let ((o (make-instance 'persistent-object
+                           :name (object-name obj)
+                           :description (object-description obj)
+                           :type (object-type obj))))
+                  (clone-properties obj o)
+                  o)))))
+    (world-set-object-id! persistent-world p)
+    (setf (gethash obj map) p)))
+
+(defun materialize-relationships (transient-world persistent-world map)
+  "Restore cross-references between persistent objects: locations, exits,
+room contents, and the starting room."
+  (dolist (obj (world-all-objects transient-world))
+        (unless (typep obj 'mud-character)
+          (let ((p (gethash obj map)))
+            (when p
+              ;; Location
+              (let ((old-loc (object-location obj)))
+                (when old-loc
+                  (let ((new-loc (gethash old-loc map)))
+                    (when new-loc
+                      (setf (object-location p) new-loc)))))
+              ;; Room-specific relationships
+              (when (typep obj 'mud-room)
+                ;; Exits
+                (maphash (lambda (dir target)
+                           (let ((new-target (gethash target map)))
+                             (when new-target
+                               (room-add-exit p dir new-target))))
+                         (room-exits obj))
+                ;; Contents
+                (loop for child across (room-contents obj)
+                      do (let ((new-child (gethash child map)))
+                           (when new-child
+                             (room-add-object p new-child))))))))
+      ;; Starting room
+      (let ((old-start (starting-room transient-world)))
+        (when old-start
+          (let ((new-start (gethash old-start map)))
+            (when new-start
+              (world-set-starting-room! persistent-world new-start)))))))
+
+(defun materialize-world (transient-world)
+  "Convert a transient MUD world into a persistent one.
+
+All rooms, objects, NPCs, and guestbooks in TRANSIENT-WORLD are re-created
+as BKNR-persistent instances within a single transaction.  Relationships
+(locations, exits, room contents, properties) are faithfully copied.
+
+Returns the new PERSISTENT-WORLD."
+  (let ((pw (make-instance 'persistent-world))
+        (map (make-hash-table :test #'eq)))
+    (bknr.datastore:with-transaction ("materialize-world")
+      ;; Phase 1 — create persistent counterparts
+      (dolist (obj (world-all-objects transient-world))
+        (unless (typep obj 'mud-character)
+          (materialize-object obj pw map)))
+      ;; Phase 2 — restore cross-references
+      (materialize-relationships transient-world pw map))
+    pw))
+
+;; ─── World restore / initialize ─────────────────────────────────────────────
+
+(defun world-restore-or-initialize (&key force-new (initializer nil))
+  "Restore the world from the BKNR datastore, or create a fresh one.
+
+When no stored world is found, INITIALIZER is called with no arguments to
+produce a transient MUD-WORLD which is then materialized into persistence.
+If INITIALIZER is NIL (the default), `DEFAULT-TRANSIENT-WORLD` is used.
 When FORCE-NEW is true any existing store data is wiped first."
   (when force-new
     (log-message "Forcing new world, clearing existing datastore…")
@@ -191,10 +301,13 @@ When FORCE-NEW is true any existing store data is wiped first."
           (when *debug-mode*
             (log-message "World restored from BKNR datastore."))
           world)
-        (let ((world (initial-world)))
+        (let* ((transient (if initializer
+                              (funcall initializer)
+                              (default-transient-world)))
+               (world (materialize-world transient)))
           (sync-world)
           (when *debug-mode*
-            (log-message "New world created and persisted."))
+            (log-message "New world created from transient and persisted."))
           world))))
 
 ;; ─── World queries ──────────────────────────────────────────────────────────

@@ -64,8 +64,19 @@
                 :components
                 ((:file "package")
                  (:file "store")
-                 (:file "persistent-world" :depends-on ("store"))
-                 (:file "world-areas" :depends-on ("persistent-world"))))))
+                 (:file "persistent-world" :depends-on ("store"))))))
+
+(defsystem "apeiron-worlds"
+  :version "0.0.1"
+  :description "Transient world definitions for the Apeiron MUD."
+  :author "Sophia Velten"
+  :license "MIT"
+  :depends-on ("apeiron-core")
+  :components ((:module "src/worlds"
+                :components
+                ((:file "package")
+                 (:file "apeiron" :depends-on ("package"))
+                 (:file "world-areas" :depends-on ("apeiron"))))))
 
 (defsystem "apeiron-server"
   :version "0.0.1"
@@ -93,6 +104,7 @@
   :depends-on ("apeiron-core"
                "apeiron-telnet"
                "apeiron-persistence"
+               "apeiron-worlds"
                "apeiron-server"))
 
 

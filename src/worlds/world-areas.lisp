@@ -1,9 +1,11 @@
-;;;; src/persistence/world-areas.lisp — Pre-built persistent world areas
+;;;; src/worlds/world-areas.lisp — Pre-built transient world areas
 ;;;;
-;;;; These builder functions create the persistent room/NPC layout for the
-;;;; Desert Oasis Mall and the Team Rocket cavern maze.
+;;;; These builder functions create the transient room/NPC layout for the
+;;;; Apeiron world: the hub biomes, Desert Oasis Mall, and the Team Rocket
+;;;; cavern maze.  Call INITIAL-WORLD to produce a mud-world that can then
+;;;; be materialized into a persistent-world via APEIRON.PERSISTENCE:MATERIALIZE-WORLD.
 
-(in-package #:apeiron.persistence)
+(in-package #:apeiron.worlds)
 
 ;; ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -27,24 +29,58 @@
                          (format nil "gate-~A-message" (string-downcase exit-direction))
                          message)))
 
+(defun initial-world ()
+  "Create a fresh world with default rooms and guestbook.
+   All persistent objects are created within a single transaction."
+  (let ((world (make-instance 'mud-world)))
+    (let ((gathering (new-room :name "The Gathering"
+                                          :description "A warm, circular hall with a high domed ceiling. Torches flicker along the stone walls, casting dancing shadows. Four archways stand at the cardinal points, each bearing a carved symbol: a leaf (north), a sun (east), a droplet (west), and a flame (south). A sturdy oak guestbook sits on a pedestal in the centre."))
+          (forest (new-room :name "A Whispering Forest"
+                                       :description "Ancient trees tower overhead, their leaves rustling secrets in the wind. Shafts of golden sunlight pierce the canopy, illuminating patches of moss and wildflowers. A faint path winds deeper into the woods."))
+          (desert (new-room :name "A Sun-Bleached Desert"
+                                       :description "Endless dunes of golden sand stretch to the horizon under a blinding sun. The heat shimmers in waves, and the silence is broken only by the occasional skitter of a unseen creature. The bleached bones of a long-dead beast protrude from a nearby dune."))
+          (swamp (new-room :name "A Murky Swamp"
+                                      :description "Stagnant water laps at gnarled tree roots as thick mist curls around your ankles. The air is heavy with the smell of decay and damp earth. Somewhere in the distance, a bullfrog croaks and something large splashes."))
+          (volcano (new-room :name "A Rumbling Volcano"
+                                        :description "The ground trembles beneath your feet. Glowing lava flows through cracks in the black, jagged rock, casting an eerie red glow across the cavern. Heat shimmers violently and the air reeks of sulphur. The mountain groans above you."))
+          (guestbook (new-guestbook :name "an oak guestbook")))
+      ;; Place the guestbook in The Gathering
+      (room-add-object gathering guestbook)
+      ;; Connect The Gathering (hub) to the four biomes
+      (room-add-exits gathering "north" forest "south")
+      (room-add-exits gathering "east" desert "west")
+      (room-add-exits gathering "west" swamp "east")
+      (room-add-exits gathering "south" volcano "north")
+      ;; Desert door → shopping mall → Team Rocket cavern maze
+      (build-shopping-mall world desert)
+      ;; Register all objects in the world
+      (world-set-object-id! world guestbook)
+      (world-set-object-id! world gathering)
+      (world-set-object-id! world forest)
+      (world-set-object-id! world desert)
+      (world-set-object-id! world swamp)
+      (world-set-object-id! world volcano)
+      (world-set-starting-room! world gathering))
+    world))
+
 ;; ─── Desert Oasis Mall ───────────────────────────────────────────────────────
 
 (defun build-shopping-mall (world desert)
   "Add the Desert Oasis Mall, linked from the desert via a shimmering door."
   (let* ((door-flavor " A shimmering glass door materializes from the heat haze — frosted letters read 'DESERT OASIS MALL'.")
-         (mall (new-persistent-room
+         (mall (new-room
                 :name "Desert Oasis Mall"
                 :description
                 "A gleaming air-conditioned shopping mall defies the desert outside. Escalators hum, pop music echoes off polished tile, and neon signs advertise everything from potions to plush monsters. Shoppers wander between kiosks while a fountain burbles in the centre."))
-         (food-court (new-persistent-room
+         (food-court (new-room
                       :name "Food Court"
                       :description
                       "Rows of fast-food counters line this open plaza. The smell of fried Magikarp sticks and berry smoothies fills the air. Picnic tables are packed with tired trainers on lunch break."))
-         (arcade (new-persistent-room
+         (arcade (new-room
                   :name "Arcade Zone"
                   :description
                   "Flashing cabinets and claw machines dominate this wing. A 'Team Rocket Cavern Adventure' ride sits behind a velvet rope — a maintenance hatch beside it is slightly ajar, leaking cold underground air."))
-         (fashion (new-persistent-room
+         (fashion (new-room
                    :name "Fashion Wing"
                    :description
                    "Mannequins display the latest trainer gear: cargo shorts, fingerless gloves, and hats that somehow never fall off during battle. A sale banner screams '50% OFF REPEL!'.")))
@@ -63,65 +99,65 @@
 
 (defun build-team-rocket-cavern (world)
   "Build the Team Rocket cavern maze with fights and challenges."
-  (let* ((entrance (new-persistent-room
+  (let* ((entrance (new-room
                     :name "Team Rocket Cavern Mouth"
                     :description
                     "You squeeze through the maintenance hatch into a rough-hewn cavern. A crimson 'R' is spray-painted on the wall. Distant voices chant 'Prepare for trouble!' echo off the stone."))
-         (crossroads (new-persistent-room
+         (crossroads (new-room
                       :name "Cavern Crossroads"
                       :description
                       "Three tunnels branch off here. Faint footprints and discarded candy wrappers mark the paths. A scratched sign reads: 'Trespassers will be recruited!'."))
-         (grunt-patrol (new-persistent-room
+         (grunt-patrol (new-room
                         :name "Grunt Patrol Route"
                         :description
                         "A narrow patrol corridor lit by flickering torches. Pallets of stolen goods are stacked against the walls."))
-         (riddle-gallery (new-persistent-room
+         (riddle-gallery (new-room
                           :name "Riddle Gallery"
                           :description
                           "Portraits of villainous-looking cats and snakes line the walls. A plaque reads: 'Speak the name of the coin-loving feline to proceed east.'"))
-         (cat-alley (new-persistent-room
+         (cat-alley (new-room
                      :name "Cat Alley"
                      :description
                      "A dead-end alcove with a bronze Meowth statue. It glares at you with gem eyes. 'I'm not saying anything,' it seems to say."))
-         (mirror-maze (new-persistent-room
+         (mirror-maze (new-room
                        :name "Mirror Maze"
                        :description
                        "Reflective panels create endless copies of you. Every turn looks the same. Only one path leads onward."))
-         (elite-patrol (new-persistent-room
+         (elite-patrol (new-room
                         :name "Elite Patrol Post"
                         :description
                         "This checkpoint is heavily guarded. A chalkboard lists 'Today's Evil Plan: Steal ALL the rare candies.'"))
-         (password-gate (new-persistent-room
+         (password-gate (new-room
                          :name "Password Gate"
                          :description
                          "A steel door blocks the north tunnel. A keypad blinks beside a note: 'Enter the organization password to proceed.'"))
-         (hidden-lab (new-persistent-room
+         (hidden-lab (new-room
                       :name "Hidden Lab"
                       :description
                       "Abandoned lab equipment and broken Poké Ball molds litter this side chamber. Someone left a half-eaten donut on a centrifuge."))
-         (boss-chamber (new-persistent-room
+         (boss-chamber (new-room
                         :name "Boss G's Chamber"
                         :description
                         "A vast cavern with a raised platform. Boss G stands with arms crossed, a Persian at his feet. 'So you've made it this far, brat,' he sneers."))
-         (treasure (new-persistent-room
+         (treasure (new-room
                     :name "Rocket Treasure Vault"
                     :description
                     "Gold coins, rare candies, and a golden 'R' badge glint in the torchlight. A banner reads: 'Congratulations — you ruined our entire operation!'."))
-         (grunt (new-persistent-npc
+         (grunt (new-npc
                  :name "a Team Rocket grunt"
                  :description "A uniformed goon in a white W and black R cap."
                  :hp 15 :max-hp 15
                  :attack-min 3 :attack-max 6
                  :defeat-message "The grunt drops a handful of coins and flees, yelling 'We're blasting off again!'"
                  :victory-flag "beat-grunt-1"))
-         (elite (new-persistent-npc
+         (elite (new-npc
                  :name "an elite Rocket agent"
                  :description "A smug agent with mirrored shades and a stolen Master Ball on his belt."
                  :hp 25 :max-hp 25
                  :attack-min 5 :attack-max 9
                  :defeat-message "The elite agent stumbles backward. 'Impossible! Boss G will hear about this!'"
                  :victory-flag "beat-elite"))
-         (boss (new-persistent-npc
+         (boss (new-npc
                 :name "Boss G"
                 :description "The infamous leader of this shady outfit, stroking his Persian."
                 :hp 45 :max-hp 45
