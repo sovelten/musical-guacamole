@@ -109,41 +109,6 @@ close/reopen cycles that trigger BKNR transaction log replay warnings."
   (bknr.datastore:snapshot)
   t)
 
-;; ─── Minimal transient world builder ────────────────────────────────────────
-
-(defun default-transient-world ()
-  "Create a bare transient world with the five hub rooms and a guestbook.
-
-This is the fallback used when WORLD-RESTORE-OR-INITIALIZE is called
-without an :INITIALIZER.  The full Apeiron world (with mall, cavern,
-NPCs, etc.) lives in the APEIRON.WORLDS system."
-  (let ((world (make-instance 'mud-world)))
-    (let ((gathering (new-room :name "The Gathering"
-                              :description "A warm, circular hall with a high domed ceiling. Torches flicker along the stone walls, casting dancing shadows."))
-          (forest (new-room :name "A Whispering Forest"
-                            :description "Ancient trees tower overhead, their leaves rustling secrets in the wind."))
-          (desert (new-room :name "A Sun-Bleached Desert"
-                            :description "Endless dunes of golden sand stretch to the horizon under a blinding sun."))
-          (swamp (new-room :name "A Murky Swamp"
-                           :description "Stagnant water laps at gnarled tree roots as thick mist curls around your ankles."))
-          (volcano (new-room :name "A Rumbling Volcano"
-                             :description "The ground trembles beneath your feet. Glowing lava flows through cracks in the black, jagged rock."))
-          (guestbook (new-guestbook :name "an oak guestbook"
-                                    :filepath (namestring (merge-pathnames "guestbook.csv" *data-directory*)))))
-      (room-add-object gathering guestbook)
-      (room-add-exits gathering "north" forest "south")
-      (room-add-exits gathering "east" desert "west")
-      (room-add-exits gathering "west" swamp "east")
-      (room-add-exits gathering "south" volcano "north")
-      (world-set-object-id! world guestbook)
-      (world-set-object-id! world gathering)
-      (world-set-object-id! world forest)
-      (world-set-object-id! world desert)
-      (world-set-object-id! world swamp)
-      (world-set-object-id! world volcano)
-      (world-set-starting-room! world gathering))
-    world))
-
 ;; ─── World materialization ──────────────────────────────────────────────────
 
 (defun clone-properties (source target)
@@ -250,7 +215,7 @@ Returns the new PERSISTENT-WORLD."
 
 ;; ─── World restore / initialize ─────────────────────────────────────────────
 
-(defun world-restore-or-initialize (&key force-new (initializer nil))
+(defun world-restore-or-initialize (&key force-new transient-world)
   "Restore the world from the BKNR datastore, or create a fresh one.
 
 When no stored world is found, INITIALIZER is called with no arguments to
@@ -301,10 +266,7 @@ When FORCE-NEW is true any existing store data is wiped first."
           (when *debug-mode*
             (log-message "World restored from BKNR datastore."))
           world)
-        (let* ((transient (if initializer
-                              (funcall initializer)
-                              (default-transient-world)))
-               (world (materialize-world transient)))
+        (let ((world (materialize-world transient-world)))
           (sync-world)
           (when *debug-mode*
             (log-message "New world created from transient and persisted."))

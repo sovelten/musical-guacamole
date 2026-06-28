@@ -213,3 +213,10 @@
     (register-room world boss-chamber)
     (register-room world treasure)
     entrance))
+
+(defun new-default-world ()
+  (let ((world (initial-world))
+        (desert (world-object-with-name "A Whispering Desert")))
+    (build-shopping-mall world desert)
+    (build-team-rocket-carvern world)
+    world))
