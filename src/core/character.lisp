@@ -13,7 +13,7 @@
   (let ((character (make-instance 'mud-character
                                   :id (make-id)
                                   :name name
-                                  :type +object-type-character+
+                                  
                                   :session session)))
     ;; Link player to session
     (setf (session-character session) character)

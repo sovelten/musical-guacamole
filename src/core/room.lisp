@@ -14,7 +14,7 @@
   (make-instance 'mud-room
                  :name name
                  :description description
-                 :type +object-type-room+
+                 
                  :location nil))
 
 (defun room-add-exit (room direction target-room)

@@ -18,12 +18,6 @@
    #:*mud-version*
    #:*debug-mode*
 
-   ;; Object type constants
-   #:+object-type-generic+
-   #:+object-type-room+
-   #:+object-type-character+
-   #:+object-type-item+
-
    ;; Command constants
    #:+max-command-length+
    #:+command-timeout+
@@ -108,7 +102,6 @@
    #:object-describe
    #:object-location
    #:object-properties
-   #:object-type
    #:object-get-property
    #:object-set-property
    #:object-move

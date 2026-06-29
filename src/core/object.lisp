@@ -13,10 +13,6 @@
                 :accessor object-description
                 :initform ""
                 :documentation "Object description")
-   (type :initarg :type
-         :accessor object-type
-         :initform +object-type-generic+
-         :documentation "Type of object (generic, room, player, item, etc.)")
    (location :initarg :location
              :accessor object-location
              :initform nil
@@ -27,11 +23,10 @@
                :documentation "Extensible property storage"))
   (:documentation "Base class for all MUD objects"))
 
-(defun new-object (&key (name "object") (type +object-type-generic+) (location nil))
+(defun new-object (&key (name "object") (location nil))
   "Create a new MUD object."
   (make-instance 'mud-object
                  :name name
-                 :type type
                  :location location))
 
 (defun object-get-property (obj property-name)
@@ -66,11 +61,11 @@
     (cond
       ((typep obj 'mud-npc)
        (bright-red (format nil "~A (ID: ~D)" name (object-id obj))))
-      ((eq (object-type obj) +object-type-character+)
+      ((typep obj 'mud-character)
        (bright-green (format nil "~A (ID: ~D)" name (object-id obj))))
-      ((eq (object-type obj) +object-type-item+)
+      ((typep obj 'mud-guestbook)
        (cyan (format nil "~A (ID: ~D)" name (object-id obj))))
-      ((eq (object-type obj) +object-type-room+)
+      ((typep obj 'mud-room)
        (bold-white (format nil "~A (ID: ~D)" name (object-id obj))))
       (t
        (format nil "~A (ID: ~D)" name (object-id obj))))))

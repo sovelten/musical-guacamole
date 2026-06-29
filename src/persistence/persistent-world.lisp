@@ -39,7 +39,6 @@
   (make-instance 'persistent-object
                  :name name
                  :description description
-                 :type +object-type-room+
                  :location nil))
 
 (defun new-persistent-room (&key (name "A Room") (description ""))
@@ -47,7 +46,6 @@
   (make-instance 'persistent-room
                  :name name
                  :description description
-                 :type +object-type-room+
                  :location nil))
 
 (defun new-persistent-npc (&key name description hp max-hp attack-min attack-max
@@ -57,7 +55,6 @@
     (make-instance 'persistent-npc
                    :name name
                    :description description
-                   :type +object-type-character+
                    :hp (or hp max-hp)
                    :max-hp max-hp
                    :attack-min attack-min
@@ -73,7 +70,7 @@
          (gb (make-instance 'persistent-guestbook
                             :name name
                             :filepath filepath-str
-                            :type +object-type-item+)))
+)))
     (when filepath-str
       (log-message "Loading csv from ~A" filepath-str)
       (setf (guestbook-entries gb)
@@ -119,7 +116,6 @@ and store the mapping in MAP (transient -> persistent)."
                 (let ((n (make-instance 'persistent-npc
                            :name (object-name obj)
                            :description (object-description obj)
-                           :type (object-type obj)
                            :hp (npc-hp obj)
                            :max-hp (npc-max-hp obj)
                            :attack-min (npc-attack-min obj)
@@ -133,7 +129,6 @@ and store the mapping in MAP (transient -> persistent)."
                 (let ((gb (make-instance 'persistent-guestbook
                             :name (object-name obj)
                             :description (object-description obj)
-                            :type (object-type obj)
                             :filepath (guestbook-filepath obj))))
                   (clone-properties obj gb)
                   (setf (guestbook-entries gb)
@@ -142,15 +137,13 @@ and store the mapping in MAP (transient -> persistent)."
                (mud-room
                 (let ((r (make-instance 'persistent-room
                            :name (object-name obj)
-                           :description (object-description obj)
-                           :type (object-type obj))))
+                           :description (object-description obj))))
                   (clone-properties obj r)
                   r))
                (mud-object
                 (let ((o (make-instance 'persistent-object
                            :name (object-name obj)
-                           :description (object-description obj)
-                           :type (object-type obj))))
+                           :description (object-description obj))))
                   (clone-properties obj o)
                   o)))))
     (world-set-object-id! persistent-world p)
