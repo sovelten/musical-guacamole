@@ -75,7 +75,8 @@ jobs:
       # Verify BSD telnet is present — confirms we are on the right
       # platform for this regression test.
       - name: Confirm BSD telnet is available
-        run: telnet --version 2>&1 || telnet -h 2>&1 | head -3 || echo "telnet binary: $(which telnet)"
+        run: |
+          telnet --version 2>&1 || telnet -h 2>&1 | head -3 || which telnet
 
       - name: Run telnet unit tests (includes DEL 0x7F erase)
         run: sbcl --non-interactive --load run-telnet-tests.lisp
