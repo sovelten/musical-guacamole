@@ -565,6 +565,15 @@ this function has already consumed, looping forever until timeout."
             ((and (null char) (or (eq status :eof) (eq status :connection-lost)))
              (return (values nil status)))
 
+            ;; BS (08) or DEL (7F) — erase last character from accumulator.
+            ;; macOS BSD telnet passes these through as data bytes; Linux
+            ;; telnet strips them locally.  We handle both here.
+            ((and char (or (= (char-code char) 8)    ; #x08 BS
+                           (= (char-code char) 127))) ; #x7F DEL
+             (setf saw-cr nil)
+             (when (> (fill-pointer acc) 0)
+               (decf (fill-pointer acc))))
+
             ((char= char #\Return)
              (setf saw-cr t))
 
