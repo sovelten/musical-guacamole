@@ -3,17 +3,18 @@
 ;;;;
 ;;;; The project is organised into four modules, each with its own system:
 ;;;;
-;;;;   apeiron-core       — Game logic: world, characters, rooms, objects,
-;;;;                         sessions (without telnet I/O).
-;;;;   apeiron-telnet     — RFC 854 telnet protocol implementation (standalone).
-;;;;   apeiron-persistence — BKNR datastore persistence layer.
-;;;;   apeiron-server     — Server that wires telnet I/O, persistence, and
-;;;;                         game logic together.
+;;;;   apeiron/core        — Game logic: world, characters, rooms, objects,
+;;;;                          sessions (without telnet I/O).
+;;;;   apeiron/telnet      — RFC 854 telnet protocol implementation (standalone).
+;;;;   apeiron/persistence — BKNR datastore persistence layer.
+;;;;   apeiron/server      — Server that wires telnet I/O, persistence, and
+;;;;                          game logic together.
+;;;;   apeiron/worlds      — Transient world definitions.
 ;;;;
 ;;;; One convenience alias is provided:
-;;;;   apeiron            — depends on all four modules above.
+;;;;   apeiron             — depends on all five modules above.
 
-(defsystem "apeiron-core"
+(defsystem "apeiron/core"
   :version "0.0.1"
   :description "Core game logic for the Apeiron MUD — world, characters, and their dependencies."
   :author "Sophia Velten"
@@ -35,7 +36,7 @@
                  (:file "command-handler" :depends-on ("session"))
                  (:file "world" :depends-on ("room" "guestbook" "character"))))))
 
-(defsystem "apeiron-telnet"
+(defsystem "apeiron/telnet"
   :version "0.0.1"
   :description "Standalone RFC 854 Telnet protocol implementation."
   :author "Sophia Velten"
@@ -51,12 +52,12 @@
                  (:file "connection" :depends-on ("package" "protocol"))
                  (:file "tls" :depends-on ("package" "protocol" "connection"))))))
 
-(defsystem "apeiron-persistence"
+(defsystem "apeiron/persistence"
   :version "0.0.1"
   :description "BKNR datastore persistence layer for the Apeiron MUD."
   :author "Sophia Velten"
   :license "MIT"
-  :depends-on ("apeiron-core"
+  :depends-on ("apeiron/core"
                "bknr.datastore"
                "bknr.indices"
                "bknr.utils")
@@ -66,26 +67,26 @@
                  (:file "store")
                  (:file "persistent-world" :depends-on ("store"))))))
 
-(defsystem "apeiron-worlds"
+(defsystem "apeiron/worlds"
   :version "0.0.1"
   :description "Transient world definitions for the Apeiron MUD."
   :author "Sophia Velten"
   :license "MIT"
-  :depends-on ("apeiron-core")
+  :depends-on ("apeiron/core")
   :components ((:module "src/worlds"
                 :components
                 ((:file "package")
                  (:file "apeiron" :depends-on ("package"))
                  (:file "world-areas" :depends-on ("apeiron"))))))
 
-(defsystem "apeiron-server"
+(defsystem "apeiron/server"
   :version "0.0.1"
   :description "MUD server — wires telnet I/O, persistence, and game logic together."
   :author "Sophia Velten"
   :license "MIT"
-  :depends-on ("apeiron-core"
-               "apeiron-persistence"
-               "apeiron-telnet"
+  :depends-on ("apeiron/core"
+               "apeiron/persistence"
+               "apeiron/telnet"
                "usocket"
                "bordeaux-threads")
   :components ((:module "src/server"
@@ -101,10 +102,8 @@
   :description "Apeiron MUD — a MUD server written in Common Lisp, inspired by DGD and LMUD."
   :author "Sophia Velten"
   :license "MIT"
-  :depends-on ("apeiron-core"
-               "apeiron-telnet"
-               "apeiron-persistence"
-               "apeiron-worlds"
-               "apeiron-server"))
-
-
+  :depends-on ("apeiron/core"
+               "apeiron/telnet"
+               "apeiron/persistence"
+               "apeiron/worlds"
+               "apeiron/server"))
