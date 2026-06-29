@@ -1,0 +1,39 @@
+name: Telnet Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  telnet-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SBCL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y sbcl
+
+      - name: Install Quicklisp
+        run: |
+          curl -fsSL https://beta.quicklisp.org/quicklisp.lisp -o /tmp/quicklisp.lisp
+          sbcl --non-interactive \
+               --load /tmp/quicklisp.lisp \
+               --eval '(quicklisp-quickstart:install :path (merge-pathnames "quicklisp/" (user-homedir-pathname)))' \
+               --eval '(sb-ext:exit :code 0)'
+
+      - name: Cache Quicklisp dist
+        uses: actions/cache@v4
+        with:
+          path: ~/quicklisp/dists
+          key: ql-dists-${{ hashFiles('apeiron.asd', 'apeiron-test.asd') }}
+          restore-keys: ql-dists-
+
+      - name: Run telnet unit tests
+        run: |
+          sbcl --non-interactive --load run-telnet-tests.lisp
+        timeout-minutes: 5

@@ -1,5 +1,11 @@
 (unless (find-package :quicklisp)
-  (load "/home/sophia/.quicklisp/setup.lisp"))
+  (let ((candidates (list "/home/sophia/.quicklisp/setup.lisp"
+                          (merge-pathnames "quicklisp/setup.lisp"
+                                          (user-homedir-pathname)))))
+    (dolist (p candidates)
+      (when (probe-file p)
+        (load p)
+        (return)))))
 
 (push #p"./" asdf:*central-registry*)
 
@@ -24,7 +30,12 @@
                telnet-terminal-type-subnegotiation
                telnet-iac-escape-doubles-iac
                telnet-read-char-eof
-               telnet-write-read-roundtrip)))
+               telnet-write-read-roundtrip
+               ;; Backspace / erase handling (macOS BSD telnet compatibility)
+               telnet-read-line-bs-erases-char
+               telnet-read-line-del-erases-char
+               telnet-read-line-bs-at-empty-buffer
+               telnet-read-line-multiple-bs)))
   (dolist (test tests)
     (format t "~%=== ~S ===~%" test)
     (handler-case

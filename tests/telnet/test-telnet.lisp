@@ -459,6 +459,97 @@ to WRITE-STREAM."
       (let ((raw (telnet::telnet-conn-raw-stream conn)))
         (when raw (ignore-errors (close raw :abort t)))))))
 
+;; ---------------------------------------------------------------
+;; Test: BS (0x08) erases the last character
+;; ---------------------------------------------------------------
+
+(test telnet-read-line-bs-erases-char
+  "BS (0x08) sent by the client should erase the last character in the buffer."
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           ;; Send: "hell" BS "o" CR LF — should yield "hello"
+           (write-bytes write-stream
+                        (concatenate '(vector (unsigned-byte 8))
+                                     (flexi-streams:string-to-octets "hell" :external-format :utf-8)
+                                     #(8)  ; BS
+                                     (flexi-streams:string-to-octets "o" :external-format :utf-8)
+                                     #(13 10)))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2)
+             (is (string= line "hello"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+;; ---------------------------------------------------------------
+;; Test: DEL (0x7F) erases the last character (macOS BSD telnet)
+;; ---------------------------------------------------------------
+
+(test telnet-read-line-del-erases-char
+  "DEL (0x7F) sent by the client (macOS BSD telnet) should erase the last character."
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           ;; Send: "hell" DEL "o" CR LF — should yield "hello"
+           (write-bytes write-stream
+                        (concatenate '(vector (unsigned-byte 8))
+                                     (flexi-streams:string-to-octets "hell" :external-format :utf-8)
+                                     #(127)  ; DEL
+                                     (flexi-streams:string-to-octets "o" :external-format :utf-8)
+                                     #(13 10)))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2)
+             (is (string= line "hello"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+;; ---------------------------------------------------------------
+;; Test: BS at start of line does nothing (no underflow)
+;; ---------------------------------------------------------------
+
+(test telnet-read-line-bs-at-empty-buffer
+  "BS (0x08) at the start of a line should not crash or corrupt the buffer."
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           ;; Send: BS "hi" CR LF — BS on empty buffer is ignored
+           (write-bytes write-stream
+                        (concatenate '(vector (unsigned-byte 8))
+                                     #(8)  ; BS on empty buffer
+                                     (flexi-streams:string-to-octets "hi" :external-format :utf-8)
+                                     #(13 10)))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2)
+             (is (string= line "hi"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
+;; ---------------------------------------------------------------
+;; Test: multiple sequential BS characters
+;; ---------------------------------------------------------------
+
+(test telnet-read-line-multiple-bs
+  "Multiple sequential BS characters should each erase one character."
+  (multiple-value-bind (conn write-stream) (make-test-telnet-connection)
+    (unwind-protect
+         (progn
+           ;; Send: "abc" BS BS "xy" CR LF — should yield "axy"
+           (write-bytes write-stream
+                        (concatenate '(vector (unsigned-byte 8))
+                                     (flexi-streams:string-to-octets "abc" :external-format :utf-8)
+                                     #(8 8)  ; two BS — erase 'c' then 'b'
+                                     (flexi-streams:string-to-octets "xy" :external-format :utf-8)
+                                     #(13 10)))
+           (sleep 0.1)
+           (multiple-value-bind (line status)
+               (telnet:telnet-read-line conn :timeout 2)
+             (is (string= line "axy"))
+             (is (null status))))
+      (close-test-connection conn write-stream))))
+
 ;; ===============================================================
 ;; TLS Support Tests
 ;; ===============================================================
