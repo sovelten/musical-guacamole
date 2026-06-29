@@ -89,9 +89,9 @@ PLAYER is the character, ARGS is a raw string that the handler can parse as need
 (define-command "status" (world player args)
   (declare (ignore world args))
   (player-ensure-combat-stats player)
-  (let ((hp (player-hp player))
-        (max-hp (player-max-hp player))
-        (hp-text (format nil "~D/~D" hp max-hp)))
+  (let* ((hp (player-hp player))
+         (max-hp (player-max-hp player))
+         (hp-text (format nil "~D/~D" hp max-hp)))
     (player-send-message player
                          (format nil "HP: ~A"
                                  (if (<= hp (/ max-hp 4))
