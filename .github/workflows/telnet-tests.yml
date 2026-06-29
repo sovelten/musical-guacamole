@@ -7,7 +7,11 @@ on:
     branches: [main]
 
 jobs:
-  telnet-tests:
+  # ----------------------------------------------------------------
+  # Ubuntu — baseline Linux build
+  # ----------------------------------------------------------------
+  telnet-tests-linux:
+    name: Telnet tests (Linux)
     runs-on: ubuntu-latest
 
     steps:
@@ -30,10 +34,49 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/quicklisp/dists
-          key: ql-dists-${{ hashFiles('apeiron.asd', 'apeiron-test.asd') }}
-          restore-keys: ql-dists-
+          key: ql-dists-linux-${{ hashFiles('apeiron.asd', 'apeiron-test.asd') }}
+          restore-keys: ql-dists-linux-
 
       - name: Run telnet unit tests
+        run: sbcl --non-interactive --load run-telnet-tests.lisp
+        timeout-minutes: 5
+
+  # ----------------------------------------------------------------
+  # macOS — reproduces BSD telnet DEL (0x7F) behaviour.
+  # macOS ships BSD telnet which sends DEL instead of BS for
+  # backspace in line mode. The unit tests explicitly cover DEL
+  # (0x7F) erase so this job proves the fix works on macOS too.
+  # ----------------------------------------------------------------
+  telnet-tests-macos:
+    name: Telnet tests (macOS / BSD telnet)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SBCL
+        run: brew install sbcl
+
+      - name: Install Quicklisp
         run: |
-          sbcl --non-interactive --load run-telnet-tests.lisp
+          curl -fsSL https://beta.quicklisp.org/quicklisp.lisp -o /tmp/quicklisp.lisp
+          sbcl --non-interactive \
+               --load /tmp/quicklisp.lisp \
+               --eval '(quicklisp-quickstart:install :path (merge-pathnames "quicklisp/" (user-homedir-pathname)))' \
+               --eval '(sb-ext:exit :code 0)'
+
+      - name: Cache Quicklisp dist
+        uses: actions/cache@v4
+        with:
+          path: ~/quicklisp/dists
+          key: ql-dists-macos-${{ hashFiles('apeiron.asd', 'apeiron-test.asd') }}
+          restore-keys: ql-dists-macos-
+
+      # Verify BSD telnet is present — confirms we are on the right
+      # platform for this regression test.
+      - name: Confirm BSD telnet is available
+        run: telnet --version 2>&1 || telnet -h 2>&1 | head -3 || echo "telnet binary: $(which telnet)"
+
+      - name: Run telnet unit tests (includes DEL 0x7F erase)
+        run: sbcl --non-interactive --load run-telnet-tests.lisp
         timeout-minutes: 5

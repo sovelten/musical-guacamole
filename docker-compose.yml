@@ -1,0 +1,11 @@
+services:
+  mud:
+    build: .
+    ports:
+      - "8888:8888"
+    volumes:
+      - mud-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  mud-data:
